@@ -16,68 +16,89 @@ import PIL
 import PIL.Image
 import PIL.ExifTags
 import shutil
-import ffmpeg
+
 from cairosvg import svg2png
 import svgpathtools
+from sticky_pi_ml.utils import md5
 
-from sticky_pi_client.image_parser import ImageParser
-from sticky_pi_client.utils import md5
+# import ffmpeg
 
-def wrapper_make_png(x):
-    tmp_dir,i, im, show_datetime, scale = x
-    path_ = os.path.join(tmp_dir, "%05d.png" % i)
-    im.to_png(path_, show_datetime=show_datetime, scale=scale)
+# def wrapper_make_png(x):
+#     tmp_dir,i, im, show_datetime, scale = x
+#     path_ = os.path.join(tmp_dir, "%05d.png" % i)
+#     im.to_png(path_, show_datetime=show_datetime, scale=scale)
+#
+#
+# class ImageSequence(object):
+#     def __init__(self, images):
+#         self._images = images
+#
+#     def to_animation(self, target, show_datetime=False, scale=1, n_threads=1):
+#         tmp_dir = tempfile.mkdtemp(prefix='sticky_pi_')
+#         try:
+#             jobs = []
+#             for i, im in enumerate(self._images):
+#                 jobs.append((tmp_dir, i, im, show_datetime, scale))
+#             if n_threads == 1:
+#                 for j in jobs:
+#                     wrapper_make_png(j)
+#
+#             else:
+#                 from multiprocessing.pool import Pool
+#                 with Pool(n_threads) as p:
+#                     p.map(wrapper_make_png,jobs)
+#
+#             # overwrite_output=True does not seem to work and prompt for a quiet answer?
+#             if os.path.isfile(target):
+#                 os.remove(target)
+#
+#             (
+#                 ffmpeg.input(os.path.join(tmp_dir,"%05d.png"))
+#                 # .filter('fps', fps=1, round='up')
+#                 .output(target)
+#                 .run(quiet=True, overwrite_output=True)
+#             )
+#         finally:
+#             shutil.rmtree(tmp_dir)
 
 
-class ImageSequence(object):
-    def __init__(self, images):
-        self._images = images
-
-    def to_animation(self, target, show_datetime=False, scale=1, n_threads=1):
-        tmp_dir = tempfile.mkdtemp(prefix='sticky_pi_')
-        try:
-            jobs = []
-            for i, im in enumerate(self._images):
-                jobs.append((tmp_dir, i, im, show_datetime, scale))
-            if n_threads == 1:
-                for j in jobs:
-                    wrapper_make_png(j)
-
-            else:
-                from multiprocessing.pool import Pool
-                with Pool(n_threads) as p:
-                    p.map(wrapper_make_png,jobs)
-
-            # overwrite_output=True does not seem to work and prompt for a quiet answer?
-            if os.path.isfile(target):
-                os.remove(target)
-
-            (
-                ffmpeg.input(os.path.join(tmp_dir,"%05d.png"))
-                # .filter('fps', fps=1, round='up')
-                .output(target)
-                .run(quiet=True, overwrite_output=True)
-            )
-        finally:
-            shutil.rmtree(tmp_dir)
-
-
-class Image(ImageParser):
+class Image(object):
     def __init__(self, path):
         self._path = path
         self._filename = os.path.basename(path)
-        super().__init__(path)
-        self._md5 = self['md5']
-        self._datetime = self['datetime']
-        self._device = self['device']
+        self._md5 = md5(path)
+        file_info = self._device_datetime_info(self._filename)
+        self._datetime = file_info['datetime']
+        self._device = file_info['device']
         self._annotations = []
         self._metadata = None
         self._shape = None
         self._cached_image = None
 
-    def _parse(self, file):
-        self.update(self._device_datetime_info(file.name))
-        self['md5'] = md5(file)
+    def _device_datetime_info(self, filename):
+        fields = filename.split('.')
+
+        if len(fields) != 3:
+            raise Exception("Wrong file name, three dot-separated fields expected")
+
+        device = fields[0]
+        try:
+            if len(device) != 8:
+                raise ValueError()
+            int(device, base=16)
+        except ValueError:
+            raise Exception("Invalid device name field in file: %s" % device)
+
+        datetime_string = fields[1]
+        try:
+            date_time = datetime.datetime.strptime(datetime_string, '%Y-%m-%d_%H-%M-%S')
+            # date_time = self._timezone.localize(date_time)
+        except ValueError:
+            raise Exception("Could not retrieve datetime from filename")
+
+        return {'device': device,
+                'datetime': date_time,
+                'filename': filename}
 
     # when automatically annotating an image, we can tag the version
     @property
@@ -178,6 +199,11 @@ class Image(ImageParser):
                     for k, v in img._getexif().items()
                     if k in PIL.ExifTags.TAGS
                 }
+
+                # cast to float for compatibility 
+                for k, v in self._metadata.items():
+                    if isinstance(v, PIL.TiffImagePlugin.IFDRational):
+                        self._metadata[k] = float(v)
 
             try:
                 self._metadata['Make'] = literal_eval(self._metadata['Make'])

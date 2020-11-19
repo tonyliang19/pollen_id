@@ -10,9 +10,18 @@ class BaseDataset(object):
         self._data_dir = data_dir
         self._config = config
         self._cache_dir = cache_dir
+        self._is_prepared = False
+        self._training_data = []
+        self._val_data = []
+
+    def _prepare(self):
+        raise NotImplementedError()
 
     def prepare(self):
-        raise NotImplementedError()
+        self._prepare()
+        assert len(self._training_data) > 0, "Should have at least 1 images in Training set"
+        assert len(self._val_data) > 0, "Should have at least 1 images in Validation set"
+        self._is_prepared = True
 
     def get_loader(self, dataset: str):
         raise NotImplementedError()

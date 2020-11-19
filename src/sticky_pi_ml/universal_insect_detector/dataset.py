@@ -13,8 +13,7 @@ from detectron2.data import transforms as T
 from detectron2.structures import BoxMode
 from sticky_pi_ml.dataset import BaseDataset
 from sticky_pi_ml.image import SVGImage
-
-from sticky_pi_client.utils import md5
+from sticky_pi_ml.utils import md5
 
 import logging
 from sticky_pi_ml.universal_insect_detector.palette import Palette
@@ -51,18 +50,17 @@ class DatasetMapper(object):
 class Dataset(BaseDataset):
     def __init__(self, data_dir, config, cache_dir):
         super().__init__(data_dir, config,  cache_dir)
-        self._palette = Palette({k: v for k, v in self._config.CLASSES})
+        self._palette = None
 
-    def prepare(self):
+    def _prepare(self):
+        self._palette = Palette({k: v for k, v in self._config.CLASSES})
         # for d in self._sub_datasets:
         #     sub_ds_name = self._name + '_' + d
-        input_img_list = glob.glob(os.path.join(self._data_dir, '*.svg'))
-        assert len(input_img_list) > 1, "Should have at least 2 svg images in %s. Just got %i" % \
-                                        (self._data_dir, len(input_img_list))
+        input_img_list = sorted(glob.glob(os.path.join(self._data_dir, '*.svg')))
+        # assert len(input_img_list) > 1, "Should have at least 2 svg images in %s. Just got %i" % \
+        #                                 (self._data_dir, len(input_img_list))
         data = self._serialise_imgs_to_dicts(input_img_list)
 
-        self._training_data = []
-        self._val_data = []
 
         while len(data) > 0:
             entry = data.pop()
@@ -70,9 +68,6 @@ class Dataset(BaseDataset):
                 self._val_data.append(entry)
             else:
                 self._training_data.append(entry)
-
-        assert len(self._training_data) > 0, "Should have at least 1 svg images in Training set"
-        assert len(self._val_data) > 0, "Should have at least 1 svg images in Validation set"
 
         # register data
         for td in [self._config.DATASETS.TEST, self._config.DATASETS.TRAIN]:
