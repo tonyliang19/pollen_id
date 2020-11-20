@@ -29,7 +29,11 @@ class BaseMLBundle(object):
         self._cache_dir = cache_dir
         self._root_dir = root_dir
         self._device = device
-        assert os.path.isdir(root_dir), "%s is not a directory" % root_dir
+
+        if not os.path.isdir(root_dir):
+            logging.warning("%s is not a directory, creating it" % root_dir)
+            # assert os.path.dirname(os.path.normpath(root_dir)),
+            os.mkdir(root_dir)
 
         self._output_dir = os.path.join(self._root_dir, self._output_dirname)
         self._config_dir = os.path.join(self._root_dir, self._config_dirname)
@@ -97,11 +101,11 @@ class BaseClientMLBundle(BaseMLBundle):
 
     def sync_local_to_remote(self, what: str = 'all'):
         assert what in {'all', 'data', 'model'}
-        self._client.put_ml_bundle_dir(self._root_dir, what)
+        self._client.put_ml_bundle_dir(self._name, self._root_dir, what)
 
     def sync_remote_to_local(self, what: str = 'all'):
         assert what in {'all', 'data', 'model'}
-        self._client.get_ml_bundle_dir(self._root_dir, what)
+        self._client.get_ml_bundle_dir(self._name, self._root_dir, what)
         self.__init__(self._root_dir, self._client, self._device, self._cache_dir)
 
         # config_file = os.path.join(self._root_dir, self._config_dirname, self._config_filename)

@@ -1,3 +1,7 @@
+import os
+import dotenv
+import argparse
+import logging
 import hashlib
 
 
@@ -14,28 +18,64 @@ def md5(file, chunksize=32768):
         file.seek(0)
     return hash_md5.hexdigest()
 
+
+class MLScriptParser(argparse.ArgumentParser):
+    _valid_actions = {'fetch', 'train', 'qc', 'eval', 'push'}
+    _required_env_vars = ['BUNDLE_ROOT_DIR', 'LOCAL_CLIENT_DIR']
+
+    def __init__(self, config_file=None):
+        super().__init__()
+
+        self.add_argument("action", help=str(self._valid_actions))
+
+        self.add_argument("-v", "--verbose", dest="verbose", default=False,
+                          help="verbose",
+                          action="store_true")
+
+        self.add_argument("-D", "--debug", dest="debug", default=False,
+                          help="debug",
+                          action="store_true")
+
+        self.add_argument("-r", "--restart-training", dest="restart_training", default=False, action="store_true")
+        self.add_argument("-g", "--gpu", dest="gpu", default=False, help="GPU", action="store_true")
+        self._config_file = config_file
+
+    def _get_env_conf(self):
+        if self._config_file is not None:
+            assert os.path.isfile(self._config_file)
+            dotenv.load_dotenv(self._config_file)
+
+        out = {}
+        for var_name in self._required_env_vars:
+            out[var_name] = os.getenv(var_name)
+            if not out[var_name]:
+                raise ValueError('No environment variable `%s''' % var_name)
+        return out
+
+    def get_opt_dict(self):
+        args = self.parse_args()
+
+        option_dict = vars(args)
+        if option_dict['action'] not in self._valid_actions:
+            logging.error('Wrong action!')
+            self.print_help()
+            exit(1)
+
+        if option_dict['gpu']:
+            option_dict['device'] = 'cuda'
+        else:
+            option_dict['device'] = 'cpu'
+
+        if option_dict['verbose']:
+            logging.getLogger().setLevel(logging.INFO)
+
+        if option_dict['debug']:
+            logging.getLogger().setLevel(logging.DEBUG)
+            logging.info("DEBUG mode ON")
+
+        # 'BUNDLE_DIR', 'LOCAL_CLIENT_DIR'
+        env_conf = self._get_env_conf()
+        option_dict.update(env_conf)
+        return option_dict
+
 #
-# def multipart_etag(file, chunk_size):
-#     if type(file) == str:
-#         with open(file, 'rb') as f:
-#             return multipart_etag(f, chunk_size)
-#     file.seek(0)
-#     md5s = []
-#     while True:
-#         data = file.read(chunk_size)
-#
-#         if not data:
-#             break
-#         md5s.append(hashlib.md5(data))
-#
-#     if len(md5s) > 1:
-#         digests = b"".join(m.digest() for m in md5s)
-#         new_md5 = hashlib.md5(digests)
-#         new_etag = '%s-%s' % (new_md5.hexdigest(), len(md5s))
-#     elif len(md5s) == 1:  # file smaller than chunk size
-#         new_etag = '%s' % md5s[0].hexdigest()
-#     else:  # empty file
-#         new_etag = ''
-#
-#     file.seek(0)
-#     return new_etag

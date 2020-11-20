@@ -13,7 +13,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 
 class TestMLBundle(unittest.TestCase):
-    _bundle_dir = './uid_bundle'
+    _bundle_dir = './ml_bundles/universal-insect-detector'
     _test_image = "raw_images/5c173ff2/5c173ff2.2020-06-20_21-33-24.jpg"
 
     def test_MLBundle(self):
@@ -23,7 +23,7 @@ class TestMLBundle(unittest.TestCase):
         client_temp_dir = tempfile.mkdtemp(prefix='sticky_pi_client_')
 
         # the di dirname is used to identify the ML bundle
-        temp_dst_bundle = os.path.join(tempfile.mkdtemp(prefix='sticky_pi_test_'), 'uid_bundle')
+        temp_dst_bundle = os.path.join(tempfile.mkdtemp(prefix='sticky_pi_test_'), 'universal-insect-detector')
         os.makedirs(temp_dst_bundle)
         try:
             cli = LocalClient(client_temp_dir)
@@ -56,17 +56,16 @@ class TestMLBundle(unittest.TestCase):
             shutil.rmtree(temp_dst_bundle)
             pass
 
-    def test_Trainer(self):
-        bndl = MLBundle(self._bundle_dir)
-        # bndl.dataset.visualise(augment=True)
-        t = Trainer(bndl)
-    #     t.resume_or_load(resume=True)
-
-        # t.train()
-    def test_Predictor(self):
-        bndl = MLBundle(self._bundle_dir)
-        pred = Predictor(bndl)
-    #     im = Image(self._test_image)
-    #     pred.detect(im)
+    # def test_Trainer(self):
+    #     bndl = MLBundle(self._bundle_dir)
+    #     # bndl.dataset.visualise(augment=True)
+    #     t = Trainer(bndl)
+    # #     t.resume_or_load(resume=True)
+    #     # t.train()
+    # def test_Predictor(self):
+    #     bndl = MLBundle(self._bundle_dir)
+    #     pred = Predictor(bndl)
+    # #     im = Image(self._test_image)
+    # #     pred.detect(im)
 
 
