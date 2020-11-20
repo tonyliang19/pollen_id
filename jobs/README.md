@@ -27,12 +27,9 @@ pip install "git+https://github.com/sticky-pi/sticky-pi-api@develop#egg=sticky_p
 
 
 # Note that detectron2 is already built as a wheel in ComputeCanada
-pip install torch==1.5 pillow-simd detectron2
-pip install torchvision opencv  svgpathtools CairoSVG networkx shapely --no-index
- 
+pip install torch==1.5 pillow-simd detectron2  torchvision==0.6 pycocotools 
+
+pip install opencv  svgpathtools CairoSVG networkx shapely==1.6.4.post2 --no-index
 pip install "git+https://github.com/sticky-pi/sticky-pi-ml@develop#egg=sticky_pi_ml&subdirectory=src" --no-index  --no-deps
+pip install ipython
 ```
-
-
-
-

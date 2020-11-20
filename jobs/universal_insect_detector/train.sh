@@ -1,8 +1,10 @@
 #!/bin/bash
 source ../.secret.env
 
+PROGRAM=train_universal_insect_detector
+
 echo Training using option $1
-command="module load cuda cudnn && source ${VIRT_ENV_LOCATION}/bin/activate && python train.py $1"
+command="module load cuda cudnn && source ${VIRT_ENV_LOCATION}/bin/activate && python ${PROGRAM} $1"
 
 output=$0_$1_$(date +%F_%H-%M-%S)_%N_%j.out
 
