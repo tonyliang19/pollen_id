@@ -35,7 +35,7 @@ pip install "git+https://github.com/sticky-pi/sticky-pi-ml@develop#egg=sticky_pi
 pip install ipython
 ```
 
-## define a set of secret environment variables (*no version controlled*).
+## Define a set of secret environment variables (*not version controlled*).
 To be stored in a file names `.secret.env`, in this directory. 
 Here is a template:
 
