@@ -20,7 +20,7 @@ def md5(file, chunksize=32768):
 
 
 class MLScriptParser(argparse.ArgumentParser):
-    _valid_actions = {'fetch', 'train', 'qc', 'eval', 'push'}
+    _valid_actions = {'fetch', 'train', 'qc', 'eval', 'push', 'predict'}
     _required_env_vars = ['BUNDLE_ROOT_DIR', 'LOCAL_CLIENT_DIR']
 
     def __init__(self, config_file=None):

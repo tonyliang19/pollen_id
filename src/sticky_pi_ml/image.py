@@ -75,6 +75,12 @@ class Image(object):
         self._shape = None
         self._cached_image = None
 
+    def __repr__(self):
+        return "%s: %s.%s" % (self.__class__, self._device, self.datetime_str)
+
+    def __str__(self):
+        return self.__repr__()
+
     def _device_datetime_info(self, filename):
         fields = filename.split('.')
 
@@ -102,9 +108,9 @@ class Image(object):
 
     # when automatically annotating an image, we can tag the version
     @property
-    def auto_annotator_version(self):
+    def algo_version(self):
         try:
-            return self._metadata['auto_annotator_version']
+            return self._metadata['algo_version']
         except KeyError:
             logging.warning('No detector version')
             return None
@@ -112,20 +118,20 @@ class Image(object):
     def tag_detector_version(self, name, version):
         # we force metadata parsing if it was not
         _ = self.metadata
+        self._metadata['md5'] = self._md5
+        self._metadata.update(self._device_datetime_info(self._filename))
+        self._metadata['algo_name'] = name
+        self._metadata['algo_version'] = version
 
-        self._metadata['auto_annotator_name'] = name
-        self._metadata['auto_annotator_version'] = version
-
-    def json_annotations(self, as_json=True):
+    def annotation_dict(self, as_json=True):
         try:
-            meta_to_pass = {'auto_annotator_name': self.metadata['auto_annotator_name'],
-                            'auto_annotator_version': self.metadata['auto_annotator_version']}
+            metadata_to_pass = {k:self._metadata[k] for k in ['device', 'datetime','algo_name', 'algo_version', 'md5']}
+
         except KeyError:
             meta_to_pass = {}
 
         out = {'annotations': [a.to_dict() for a in self._annotations],
-               'metadata': meta_to_pass
-            }
+               'metadata': metadata_to_pass}
         if as_json:
             out = json.dumps(out)
         return out
@@ -191,26 +197,28 @@ class Image(object):
 
     @property
     def metadata(self):
-
         if self._metadata is None:
-            with PIL.Image.open(self._path) as img:
-                self._metadata = {
-                    PIL.ExifTags.TAGS[k]: v
-                    for k, v in img._getexif().items()
-                    if k in PIL.ExifTags.TAGS
-                }
-
-                # cast to float for compatibility 
-                for k, v in self._metadata.items():
-                    if isinstance(v, PIL.TiffImagePlugin.IFDRational):
-                        self._metadata[k] = float(v)
-
-            try:
-                self._metadata['Make'] = literal_eval(self._metadata['Make'])
-            except ValueError as e:
-                logging.warning('Missing custom metadata in %s, Make is `%s`' % (self._path, self._metadata['Make']))
-
+            self._metadata = self._decode_metadata()
         return self._metadata
+
+    def _decode_metadata(self):
+        with PIL.Image.open(self._path) as img:
+            out = {
+                PIL.ExifTags.TAGS[k]: v
+                for k, v in img._getexif().items()
+                if k in PIL.ExifTags.TAGS
+            }
+
+            # cast to float for compatibility
+            for k, v in out.items():
+                if isinstance(v, PIL.TiffImagePlugin.IFDRational):
+                    out[k] = float(v)
+
+        try:
+            out['Make'] = literal_eval(out['Make'])
+        except ValueError as e:
+            logging.warning('Missing custom metadata in %s, Make is `%s`' % (self._path, out['Make']))
+        return out
 
     def _img_buffer(self):
         with open(self._path, "rb") as image_file:
@@ -225,6 +233,7 @@ class Image(object):
         try:
             height, width = self.read().shape[0:2]
             if include_metadata:
+                meta = self.metadata
                 desc = 'desc="' + str(self.metadata) + '"'
 
             else:
@@ -343,14 +352,14 @@ class SVGImage(Image):
         elif 'width' in attrs:
             im_w = ims[0].attrib['width']
         else:
-            raise Exception('Embedded image %s does not have width' % (self._path))
+            raise Exception('Embedded image %s does not have width' % self._path)
 
         if 'h' in attrs:
             im_h = ims[0].attrib['h']
         elif 'width' in attrs:
             im_h = ims[0].attrib['height']
         else:
-            raise Exception('Embedded image %s does not have height' % (self._path))
+            raise Exception('Embedded image %s does not have height' % self._path)
 
         svg_im_shape = (int(im_h), int(im_w))
         jpg_im_shape = self._get_array().shape
@@ -374,8 +383,11 @@ class SVGImage(Image):
 
         try:
             self._metadata = literal_eval(str)
-        except ValueError:
+
+        except ValueError as e:
             logging.error('Cannot parse metadata is %s. String was is `%s`' % (self._path, self._metadata))
+            logging.error(e)
+
         if not isinstance(self._metadata['Make'], dict):
             logging.warning('Missing custom metadata in %s, Make is `%s`' % (self._path, self._metadata['Make']))
 
@@ -395,8 +407,7 @@ class SVGImage(Image):
                 sub_paths.append(svgpathtools.Path())
             sub_paths[-1].append(i)
             last_end = i.end
-        # print(path)
-        # print(sub_paths)
+
         out = []
         for sp in sub_paths:
             arr = np.array([s.poly()(tvals) for s in sp])
@@ -419,8 +430,7 @@ class SVGImage(Image):
                 logging.warning("polygon with only %i points in %s: %s" % (ctr.shape[0], self._path, str(p.attrib)))
         return out
 
-    @property
-    def metadata(self):
+    def _decode_metadata(self):
         return self._metadata
 
     def _get_array(self):

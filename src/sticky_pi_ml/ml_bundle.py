@@ -98,7 +98,9 @@ class BaseClientMLBundle(BaseMLBundle):
     def __init__(self, root_dir: str, client: BaseClient, device: str = 'cpu', cache_dir=None):
         super().__init__(root_dir, device, cache_dir)
         self._client = client
-
+    @property
+    def client(self):
+        return self._client
     def sync_local_to_remote(self, what: str = 'all'):
         assert what in {'all', 'data', 'model'}
         self._client.put_ml_bundle_dir(self._name, self._root_dir, what)
