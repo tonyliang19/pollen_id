@@ -40,7 +40,6 @@ To be stored in a file names `.secret.env`, in this directory.
 Here is a template:
 
 ```shell script
-
 export SLURM_ACCOUNT= #<FIXME>
 
 # same value as above
