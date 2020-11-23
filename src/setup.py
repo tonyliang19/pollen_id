@@ -6,7 +6,7 @@ setup(
     version=__version__,
     long_description=__doc__,
     packages=find_packages(),
-    scripts=['bin/train_universal_insect_detector.py'],
+    scripts=['bin/universal_insect_detector.py'],
     include_package_data=True,
     zip_safe=False,
     install_requires=['numpy',

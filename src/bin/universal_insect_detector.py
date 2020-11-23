@@ -4,6 +4,7 @@ from sticky_pi_ml.utils import MLScriptParser
 # fixme
 from sticky_pi_api.client import LocalClient #, RemoteClient
 from sticky_pi_ml.universal_insect_detector.trainer import Trainer
+from sticky_pi_ml.universal_insect_detector.predictor import Predictor
 
 BUNDLE_NAME = 'universal-insect-detector'
 
@@ -34,6 +35,14 @@ if __name__ == '__main__':
         t = Trainer(ml_bundle)
         t.resume_or_load(resume=not option_dict['restart_training'])
         t.train()
+
+    elif option_dict['action'] == 'predict':
+        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
+        pred = Predictor(ml_bundle)
+        pred.detect_client(client=client)
+
+
     elif option_dict['action'] == 'push':
         #todo use remote client here
         client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
