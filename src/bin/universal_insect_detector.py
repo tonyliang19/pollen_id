@@ -1,7 +1,7 @@
 import os
 from sticky_pi_ml.universal_insect_detector.ml_bundle import ClientMLBundle
 from sticky_pi_ml.utils import MLScriptParser
-# fixme 
+# fixme
 from sticky_pi_api.client import LocalClient #, RemoteClient
 from sticky_pi_ml.universal_insect_detector.trainer import Trainer
 
@@ -14,6 +14,7 @@ if __name__ == '__main__':
     bundle_dir = os.path.join(option_dict['BUNDLE_ROOT_DIR'], BUNDLE_NAME)
     ml_bundle_cache = os.path.join(bundle_dir,'.cache')
     os.makedirs(ml_bundle_cache, exist_ok=True)
+
 
     if option_dict['action'] == 'fetch':
         #todo use remote client here

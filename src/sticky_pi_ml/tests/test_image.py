@@ -47,6 +47,7 @@ class TestImage(unittest.TestCase):
         timezone = pytz.timezone("UTC")
         full_path = os.path.join(os.path.dirname(__file__), self._test_image)
         im = Image(full_path)
+        print(im)
         self.assertEqual(im.datetime, datetime.datetime(2020, 7, 5, 10, 7, 16))
         self.assertEqual(im.device, '1b74105a')
         self.assertEqual(im.filename, '1b74105a.2020-07-05_10-07-16.jpg')
