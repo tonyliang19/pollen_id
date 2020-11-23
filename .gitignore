@@ -131,4 +131,4 @@ _build/
 
 .idea/
 *.secret*
-
+*.out
