@@ -22,7 +22,9 @@ setup(
                       'shapely',
                       'torchvision',
                       'sticky_pi_api'],
-    tests_require=['nose'],
-    docs_require=['sphinx', 'sphinx_rtd_theme', 'recommonmark', 'mock', 'sphinx-autodoc-typehints'],
+    extras_require={
+        'test': ['nose', 'pytest', 'pytest-cov', 'codecov', 'coverage'],
+        'docs': ['mock', 'sphinx-autodoc-typehints', 'sphinx', 'sphinx_rtd_theme', 'recommonmark', 'mock']
+    },
     test_suite='nose.collector'
 )
