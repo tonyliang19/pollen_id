@@ -7,7 +7,7 @@ import glob
 import os
 import copy
 import torch
-from detectron2.data import detection_utils as utils
+from detectron2.data import detection_utils
 from detectron2.data import build_detection_test_loader, build_detection_train_loader
 from detectron2.data import transforms as T
 from detectron2.structures import BoxMode
@@ -22,7 +22,7 @@ from detectron2.data import DatasetCatalog, MetadataCatalog
 
 class DatasetMapper(object):
     def __init__(self, cfg):
-        #fixme add these augmentations in config
+        #fixme add these augmentations in config ?
         self.tfm_gens = [   T.RandomBrightness(0.9, 1.1),
                             T.RandomContrast(0.9, 1.1),
                             T.RandomFlip(horizontal=True, vertical=False),
@@ -43,7 +43,7 @@ class DatasetMapper(object):
             if obj.get("iscrowd", 0) == 0
         ]
         instances = utils.annotations_to_instances(annots, image.shape[:2])
-        dataset_dict["instances"] = utils.filter_empty_instances(instances)
+        dataset_dict["instances"] = detection_utils.filter_empty_instances(instances)
         return dataset_dict
 
 
@@ -61,7 +61,6 @@ class Dataset(BaseDataset):
         #                                 (self._data_dir, len(input_img_list))
         data = self._serialise_imgs_to_dicts(input_img_list)
 
-
         while len(data) > 0:
             entry = data.pop()
             if entry['md5'] > self._md5_max_training:
@@ -74,7 +73,6 @@ class Dataset(BaseDataset):
             for d in td:
                 DatasetCatalog.register(d, lambda d = d: self._training_data)
                 MetadataCatalog.get(d).set(thing_classes = self._config.CLASSES)
-
 
     def _serialise_imgs_to_dicts(self, input_img_list: List[str]):
         out = []

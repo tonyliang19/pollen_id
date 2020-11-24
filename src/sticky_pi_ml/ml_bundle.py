@@ -92,7 +92,9 @@ class BaseMLBundle(object):
         file = self._weight_file
         m = md5(file)
         return "%i-%s" % (os.path.getmtime(file), m)
-
+    @property
+    def weight_file(self):
+        return self._weight_file
 
 class BaseClientMLBundle(BaseMLBundle):
     def __init__(self, root_dir: str, client: BaseClient, device: str = 'cpu', cache_dir=None):

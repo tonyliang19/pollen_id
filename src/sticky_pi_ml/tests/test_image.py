@@ -28,11 +28,11 @@ import shutil
 #             # logging.warning(target)
 #             os.remove(target)
 
-
+test_dir = os.path.dirname(__file__)
 
 class TestImage(unittest.TestCase):
     # _test_image = "raw_images/1b74105a/1b74105a"
-    _test_image = "raw_images/1b74105a/1b74105a.2020-07-05_10-07-16.jpg"
+    _test_image = os.path.join(test_dir, "raw_images/1b74105a/1b74105a.2020-07-05_10-07-16.jpg")
     # _test_svg_images = ("sticky_pi_dir/raw_images/01abcabc.2020-01-01_01-02-03.svg",
     #                     "sticky_pi_dir/raw_images//d59ff54a.2020-03-03_18-04-20.svg",
     #                     "sticky_pi_dir/raw_images/abcdef00.2021-01-01_00-00-01.svg")

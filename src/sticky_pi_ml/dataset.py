@@ -1,6 +1,8 @@
 import shutil
 import tempfile
 import torch
+from torch.utils.data import Dataset
+
 
 class BaseDataset(object):
     _sub_datasets = {'train', 'val'}
@@ -23,11 +25,11 @@ class BaseDataset(object):
         assert len(self._val_data) > 0, "Should have at least 1 images in Validation set"
         self._is_prepared = True
 
-    def get_loader(self, dataset: str):
+    def get_torch_data_loader(self, subset: str, shuffle: bool) -> torch.utils.data.DataLoader:
         raise NotImplementedError()
 
-    def data_loader(self, sub_dataset: str) -> torch.utils.data.DataLoader:
+    def get_torch_dataset(self, subset: str, augment: bool) -> torch.utils.data.Dataset:
         raise NotImplementedError()
 
-    def visualise(self, subset='train', augment=False):
+    def visualise(self, subset : str='train', augment: bool=False, interactive:bool = True):
         raise NotImplementedError()

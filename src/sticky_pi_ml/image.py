@@ -66,7 +66,7 @@ class Image(object):
     def __init__(self, path):
         self._path = path
         self._filename = os.path.basename(path)
-        self._md5 = md5(path)
+        self._md5 = None
         file_info = self._device_datetime_info(self._filename)
         self._datetime = file_info['datetime']
         self._device = file_info['device']
@@ -118,14 +118,14 @@ class Image(object):
     def tag_detector_version(self, name, version):
         # we force metadata parsing if it was not
         _ = self.metadata
-        self._metadata['md5'] = self._md5
+        self._metadata['md5'] = self.md5
         self._metadata.update(self._device_datetime_info(self._filename))
         self._metadata['algo_name'] = name
         self._metadata['algo_version'] = version
 
     def annotation_dict(self, as_json=True):
         try:
-            metadata_to_pass = {k:self._metadata[k] for k in ['device', 'datetime','algo_name', 'algo_version', 'md5']}
+            metadata_to_pass = {k: self._metadata[k] for k in ['device', 'datetime','algo_name', 'algo_version', 'md5']}
 
         except KeyError:
             meta_to_pass = {}
@@ -142,6 +142,8 @@ class Image(object):
 
     @property
     def md5(self):
+        if self._md5 is None:
+            self._md5 = md5(self._path)
         return self._md5
 
     @property
@@ -193,7 +195,10 @@ class Image(object):
         return im
 
     def _get_array(self):
-        return cv2.imread(self._path)
+        out = cv2.imread(self._path)
+        if out is None:
+            raise Exception('Could not read image file %s' % s)
+        return out
 
     @property
     def metadata(self):
@@ -463,16 +468,17 @@ class SVGImage(Image):
 
 
 class ArrayImage(Image):
-    def __init__(self, array, device, datatime):
+    def __init__(self, array, device, datetime):
         self._array = array
         self._device = device
-        self._datetime = datatime
+        self._datetime = datetime
         self._path = None
         self._filename = None
         self._annotations = []
         self._metadata = {}
         self._shape = None
         self._cached_image = None
+        self._md5 = None
 
     def filename(self):
         raise NotImplementedError

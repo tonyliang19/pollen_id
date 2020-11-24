@@ -39,6 +39,7 @@ class Predictor(BasePredictor):
             logging.info('No info provided. Fetching all annotations')
         while True:
             client_resp = client.get_images_with_uid_annotations_series(info, what_image='metadata', what_annotation='metadata')
+
             if len(client_resp) == 0:
                 return
 
@@ -54,12 +55,14 @@ class Predictor(BasePredictor):
                              (df.algo_version.isnull()) | \
                              (self._ml_bundle.name != df.algo_name)
                 df = df[conditions].sort_values(by=['algo_version'])
+
             if len(df) == 0:
                 logging.info('All annotations uploaded!')
                 return
 
             query = [df.iloc[i].to_dict() for i in range(min(len(df), self._detect_client_chunk_size))]
-
+            # print('query')
+            # print(query)
             # for i, r in df.iterrows():
             #     query.append(r.to_dict())
             #     if len(query) == self._detect_client_chunk_size:
@@ -72,15 +75,11 @@ class Predictor(BasePredictor):
             for u in urls:
                 im = Image(u)
                 annotated_im = self.detect(im, *args, **kwargs)
-                logging.info('Detecting in image %s' % im )
+                logging.info('Detecting in image %s' % im)
                 annots = annotated_im.annotation_dict(as_json=False)
                 all_annots.append(annots)
                 logging.info("Sending annotation to client: %s" % annotated_im)
             client.put_uid_annotations(all_annots)
-
-
-
-
 
     def detect(self, image, *args, **kwargs) -> Image:
         instances = self._detect_instances(image, *args, **kwargs)

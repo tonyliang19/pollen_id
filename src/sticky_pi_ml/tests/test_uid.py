@@ -11,7 +11,6 @@ from sticky_pi_ml.universal_insect_detector.predictor import Predictor
 from sticky_pi_ml.annotations import Annotation
 from sticky_pi_api.client import LocalClient
 
-logging.getLogger().setLevel(logging.INFO)
 
 
 class MockPredictor(Predictor):
@@ -21,15 +20,20 @@ class MockPredictor(Predictor):
         for i in range(5):
             contour = np.array([[[1, 1],[3, 1],[3, 3], [1, 3]]]).transpose((1, 0, 2))
             a = Annotation(contour, '#ff0000')
+            a.parent_image
             out.append(a)
         return out
 
 
-class TestMLBundle(unittest.TestCase):
-    _bundle_dir = './ml_bundles/universal-insect-detector'
-    _test_image = "raw_images/5c173ff2/5c173ff2.2020-06-20_21-33-24.jpg"
-    _raw_images_dir = "raw_images"
-    #
+logging.getLogger().setLevel(logging.INFO)
+test_dir = os.path.dirname(__file__)
+
+
+class TestUID(unittest.TestCase):
+    _bundle_dir = os.path.join(test_dir, 'ml_bundles/universal-insect-detector')
+    _test_image = os.path.join(test_dir, "raw_images/5c173ff2/5c173ff2.2020-06-20_21-33-24.jpg")
+    _raw_images_dir = os.path.join(test_dir, "raw_images")
+
     def test_ml_bundle(self):
         bndl = MLBundle(self._bundle_dir)
     #
@@ -83,7 +87,8 @@ class TestMLBundle(unittest.TestCase):
             pred = MockPredictor(bndl)
             pred.detect_client()
 
-            pred.detect_client()
+            # second time should do nothing
+            # pred.detect_client()
 
         finally:
             shutil.rmtree(client_temp_dir)
