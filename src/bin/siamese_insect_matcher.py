@@ -25,6 +25,12 @@ if __name__ == '__main__':
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'])
         ml_bundle.sync_remote_to_local()
 
+    elif option_dict['action'] == 'candidates':
+        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        os.makedirs(CANDIDATE_DIR, exist_ok=True)
+        make_candidates(client, out_dir=CANDIDATE_DIR)
+
+
     elif option_dict['action'] == 'qc':
         raise NotImplementedError
 
@@ -43,11 +49,6 @@ if __name__ == '__main__':
     #     ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
     #     pred = Predictor(ml_bundle)
     #
-
-    elif option_dict['action'] == 'candidates':
-        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
-        os.makedirs(CANDIDATE_DIR, exist_ok=True)
-        make_candidates(client, out_dir=CANDIDATE_DIR)
 
     elif option_dict['action'] == 'push':
         #todo use remote client here

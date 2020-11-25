@@ -31,7 +31,7 @@ if __name__ == '__main__':
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
         t = Trainer(ml_bundle)
         pred = Predictor(ml_bundle)
-        os.makedirs(VALIDATION_OUT_DIR)
+        os.makedirs(VALIDATION_OUT_DIR, exist_ok=True)
         t.validate(pred, out_dir=VALIDATION_OUT_DIR)
 
 
