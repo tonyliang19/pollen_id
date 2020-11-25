@@ -14,7 +14,7 @@ class BaseDataset(object):
         self._cache_dir = cache_dir
         self._is_prepared = False
         self._training_data = []
-        self._val_data = []
+        self._validation_data = []
 
     def _prepare(self):
         raise NotImplementedError()
@@ -22,7 +22,7 @@ class BaseDataset(object):
     def prepare(self):
         self._prepare()
         assert len(self._training_data) > 0, "Should have at least 1 images in Training set"
-        assert len(self._val_data) > 0, "Should have at least 1 images in Validation set"
+        assert len(self._validation_data) > 0, "Should have at least 1 images in Validation set"
         self._is_prepared = True
 
     def get_torch_data_loader(self, subset: str, shuffle: bool) -> torch.utils.data.DataLoader:
@@ -33,3 +33,10 @@ class BaseDataset(object):
 
     def visualise(self, subset : str='train', augment: bool=False, interactive:bool = True):
         raise NotImplementedError()
+
+    @property
+    def validation_data(self):
+        return self._validation_data
+    @property
+    def training_data(self):
+        return self._training_data

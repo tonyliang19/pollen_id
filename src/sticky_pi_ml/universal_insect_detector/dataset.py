@@ -64,7 +64,7 @@ class Dataset(BaseDataset):
         while len(data) > 0:
             entry = data.pop()
             if entry['md5'] > self._md5_max_training:
-                self._val_data.append(entry)
+                self._validation_data.append(entry)
             else:
                 self._training_data.append(entry)
 
@@ -89,7 +89,8 @@ class Dataset(BaseDataset):
                    'width': w,
                    'image_id': os.path.basename(pre_extracted_jpg),
                    'annotations': self._pickled_objs_from_svg(svg_file),
-                   "md5": md5_sum
+                   "md5": md5_sum,
+                   "original_svg": svg_file
                      }]
         return out
 

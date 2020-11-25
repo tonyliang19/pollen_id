@@ -7,7 +7,7 @@ from sticky_pi_ml.universal_insect_detector.trainer import Trainer
 from sticky_pi_ml.universal_insect_detector.predictor import Predictor
 
 BUNDLE_NAME = 'universal-insect-detector'
-
+VALIDATION_OUT_DIR = 'validation_results'
 if __name__ == '__main__':
     parser = MLScriptParser()
     option_dict = parser.get_opt_dict()
@@ -26,8 +26,14 @@ if __name__ == '__main__':
     elif option_dict['action'] == 'qc':
         raise NotImplementedError
 
-    elif option_dict['action'] == 'eval':
-        raise NotImplementedError
+    elif option_dict['action'] == 'validate':
+        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
+        t = Trainer(ml_bundle)
+        pred = Predictor(ml_bundle)
+        os.makedirs(VALIDATION_OUT_DIR)
+        t.validate(pred, out_dir=VALIDATION_OUT_DIR)
+
 
     elif option_dict['action'] == 'train':
         client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])

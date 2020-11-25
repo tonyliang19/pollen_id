@@ -20,7 +20,6 @@ class MockPredictor(Predictor):
         for i in range(5):
             contour = np.array([[[1, 1],[3, 1],[3, 3], [1, 3]]]).transpose((1, 0, 2))
             a = Annotation(contour, '#ff0000')
-            a.parent_image
             out.append(a)
         return out
 
@@ -71,7 +70,7 @@ class TestUID(unittest.TestCase):
             shutil.rmtree(client_temp_dir)
             shutil.rmtree(temp_dst_bundle)
             pass
-
+    #
     def test_client_predict(self):
         client_temp_dir = tempfile.mkdtemp(prefix='sticky_pi_client_')
         # the di dirname is used to identify the ML bundle
@@ -95,10 +94,18 @@ class TestUID(unittest.TestCase):
             shutil.rmtree(temp_dst_bundle)
             pass
 
-    # def test_Trainer(self):
-    #     bndl = MLBundle(self._bundle_dir)
+    def test_validate(self):
+        bndl = MLBundle(self._bundle_dir)
     #     # bndl.dataset.visualise(augment=True)
-    #     t = Trainer(bndl)
+        pred = MockPredictor(bndl)
+        t = Trainer(bndl)
+        temp_dir = tempfile.mkdtemp(prefix='sticky_pi_test_')
+        try:
+            t.validate(pred, out_dir=temp_dir)
+        finally:
+            shutil.rmtree(temp_dir)
+            # print(temp_dir)
+
     # #     t.resume_or_load(resume=True)
     #     # t.train()
     # def test_Predictor(self):

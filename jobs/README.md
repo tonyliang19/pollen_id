@@ -17,7 +17,6 @@ pip install --no-index --upgrade pip
 
 
 # we install dependencies by hand :(
-
 # sticky pi client
 
 pip install python-dotenv passlib numpy pandas requests==2.23.0 urllib3-==1.25.9  boto3 pillow psutil joblib sqlalchemy typeguard itsdangerous --no-index
@@ -36,7 +35,7 @@ pip install ipython
 ```
 
 ## Define a set of secret environment variables (*not version controlled*).
-To be stored in a file names `.secret.env`, in this directory. 
+To be stored in a file named `.secret.env`, in **this directory**. 
 Here is a template:
 
 ```shell script
