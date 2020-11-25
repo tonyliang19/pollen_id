@@ -13,7 +13,7 @@ echo Running "$command"
 
 case "$1" in
         fetch| push)
-            sbatch --job-name=${JOBNAME} --account=${SLURM_ACCOUNT} --cpus-per-task=1 --mem=4000 --time=0-05:00 --output=$output --wrap="${command}"
+            sbatch --job-name=${JOBNAME} --account=${SLURM_ACCOUNT} --cpus-per-task=1 --mem=4000M --time=0-05:00 --output=$output --wrap="${command}"
             ;;
        train)
              sbatch --job-name=${JOBNAME}   --account=${SLURM_ACCOUNT} --gres=gpu:v100l:1 --cpus-per-task=8 --mem=40000M --time=1-00:00 --output=$output --wrap="${command} --gpu"
