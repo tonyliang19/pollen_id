@@ -175,7 +175,7 @@ class Dataset(BaseDataset):
         while len(data) > 0:
             entry = data.pop()
             if entry['md5'] > self._md5_max_training:
-                self._val_data.append(entry)
+                self._validation_data.append(entry)
             else:
                 self._training_data.append(entry)
         # print(len(self._training_data))
@@ -240,7 +240,7 @@ class Dataset(BaseDataset):
 
     def get_torch_dataset(self, subset='train', augment=False):
         assert subset in {'train', 'val'}, 'subset should be either "train" or "val"'
-        data = self._training_data if subset == 'train' else self._val_data
+        data = self._training_data if subset == 'train' else self._validation_data
         return OurTorchDataset(data, augment=augment)
 
     def visualise(self, subset='train', augment=False, interactive=True):

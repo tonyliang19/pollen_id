@@ -1,12 +1,14 @@
 import os
 
 from sticky_pi_ml.utils import MLScriptParser
-from sticky_pi_ml.siamese_insect_matcher.ml_bundle import ClientMLBundle
 from sticky_pi_api.client import LocalClient #, RemoteClient
+from sticky_pi_ml.siamese_insect_matcher.ml_bundle import ClientMLBundle
 from sticky_pi_ml.siamese_insect_matcher.trainer import Trainer
 from sticky_pi_ml.siamese_insect_matcher.predictor import Predictor
+from sticky_pi_ml.siamese_insect_matcher.candidates import make_candidates
 
 BUNDLE_NAME = 'siamese-insect-matcher'
+CANDIDATE_DIR = "candidates"
 
 if __name__ == '__main__':
     parser = MLScriptParser()
@@ -26,7 +28,7 @@ if __name__ == '__main__':
     elif option_dict['action'] == 'qc':
         raise NotImplementedError
 
-    elif option_dict['action'] == 'eval':
+    elif option_dict['action'] == 'validate':
         raise NotImplementedError
 
     elif option_dict['action'] == 'train':
@@ -36,12 +38,16 @@ if __name__ == '__main__':
         t.resume_or_load(resume=not option_dict['restart_training'])
         t.train()
 
-    elif option_dict['action'] == 'predict':
-        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
-        ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
-        pred = Predictor(ml_bundle)
-        pred.detect_client()
+    # elif option_dict['action'] == 'predict':
+    #     client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+    #     ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
+    #     pred = Predictor(ml_bundle)
+    #
 
+    elif option_dict['action'] == 'candidates':
+        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        os.makedirs(CANDIDATE_DIR, exist_ok=True)
+        make_candidates(client, out_dir=CANDIDATE_DIR)
 
     elif option_dict['action'] == 'push':
         #todo use remote client here

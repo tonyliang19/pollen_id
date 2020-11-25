@@ -7,8 +7,9 @@ from sticky_pi_ml.siamese_insect_matcher.siam_svg import SiamSVG
 from sticky_pi_api.client import LocalClient
 
 
-def make_candidates(client: LocalClient, out_dir, info = None, every=50, max_delta_t = 12 * 3600):
+def make_candidates(client: LocalClient, out_dir, info = None, every=50, max_delta_t:int = 12 * 3600):
     random.seed(1234)
+
     assert os.path.isdir(out_dir)
 
     if info is None:
@@ -21,27 +22,25 @@ def make_candidates(client: LocalClient, out_dir, info = None, every=50, max_del
                                                          what_annotation='data')
     df = pd.DataFrame(resp)
 
-    # todo match by device_id
-
     df.sort_values(['datetime'])
+
     for device, sub_df in df.groupby('device'):
         for i, ri in sub_df.iterrows():
+            target_j = random.randint(1, max_delta_t)
 
-            logging.info("IM0: %s, %s" % (ri.device, ri.datetime))
-            target_j = random.randint(1,max_delta_t)
             if i % every == 0:
                 rj = None
                 for j in range(i, len(sub_df)):
                     rj = sub_df.iloc[j]
-                    # if (rj.datetime-ri.datetime).total_seconds() < target_j:
-                    if j -i < max_delta_t // (12*3):
+                    if (rj.datetime-ri.datetime).total_seconds() < target_j:
                         continue
                 if rj is None:
                     continue
-                logging.info("IM1: %s, %s" % (rj.device, rj.datetime))
+                logging.info("Match IM1: %s, %s" % (rj.device, rj.datetime))
                 if not ri.json or not ri.json:
-                    logging.warning('No annatations')
+                    logging.warning('No annotations')
 
                 im0 = ImageJsonAnnotations(ri.url, ri.json)
                 im1 = ImageJsonAnnotations(rj.url, rj.json)
+                logging.info("Candidates Merging %s + %s in %s" % (im0.filename, im1.filename, out_dir))
                 SiamSVG.merge_two_images(im0, im1, dest_dir=out_dir)
