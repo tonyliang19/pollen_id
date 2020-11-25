@@ -7,7 +7,7 @@ setup(
     long_description=__doc__,
     packages=find_packages(),
     scripts=['bin/universal_insect_detector.py',
-             'bin/siamese_insect_matcher'],
+             'bin/siamese_insect_matcher.py'],
     include_package_data=True,
     zip_safe=False,
     install_requires=['numpy',
