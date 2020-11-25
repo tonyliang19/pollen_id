@@ -94,7 +94,7 @@ def detectron_to_pytorch_transform(Class):
     return MyClass
 
 class MLScriptParser(argparse.ArgumentParser):
-    _valid_actions = {'fetch', 'train', 'qc', 'eval', 'push', 'predict'}
+    _valid_actions = {'fetch', 'train', 'qc', 'validate', 'push', 'predict', 'candidates'}
     _required_env_vars = ['BUNDLE_ROOT_DIR', 'LOCAL_CLIENT_DIR']
 
     def __init__(self, config_file=None):
