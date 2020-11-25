@@ -141,11 +141,13 @@ class MLScriptParser(argparse.ArgumentParser):
             option_dict['device'] = 'cpu'
 
         if option_dict['verbose']:
-            logging.getLogger().setLevel(logging.INFO)
-
+            logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                                datefmt='%Y-%m-%d %H:%M:%S',
+                                level=logging.INFO)
         if option_dict['debug']:
-            logging.getLogger().setLevel(logging.DEBUG)
-            logging.info("DEBUG mode ON")
+            logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                                datefmt='%Y-%m-%d %H:%M:%S',
+                                level=logging.DEBUG)
 
         # 'BUNDLE_DIR', 'LOCAL_CLIENT_DIR'
         env_conf = self._get_env_conf()
