@@ -37,8 +37,11 @@ def make_candidates(client: LocalClient, out_dir, info = None, every=50, max_del
                 if rj is None:
                     continue
                 logging.info("Match IM1: %s, %s" % (rj.device, rj.datetime))
+
                 if not ri.json or not ri.json:
                     logging.warning('No annotations')
+                logging.info(ri.json)
+                logging.info(rj.json)
 
                 im0 = ImageJsonAnnotations(ri.url, ri.json)
                 im1 = ImageJsonAnnotations(rj.url, rj.json)
