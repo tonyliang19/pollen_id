@@ -34,11 +34,11 @@ def make_candidates(client: LocalClient, out_dir, info = None, every=50, max_del
                     rj = sub_df.iloc[j]
                     if (rj.datetime-ri.datetime).total_seconds() < target_j:
                         continue
-                if rj is None:
+                if rj.json is None:
                     continue
                 logging.info("Match IM1: %s, %s" % (rj.device, rj.datetime))
 
-                if not ri.json or not ri.json:
+                if not ri.json or not rj.json:
                     logging.warning('No annotations')
                 logging.info(ri.json)
                 logging.info(rj.json)
