@@ -10,3 +10,7 @@ class BasePredictor(object):
     @property
     def version(self):
         return self._version
+
+    @property
+    def name(self):
+        return self._name

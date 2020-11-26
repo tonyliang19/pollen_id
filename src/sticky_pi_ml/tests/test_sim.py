@@ -12,10 +12,9 @@ from sticky_pi_ml.siamese_insect_matcher.candidates import make_candidates
 from sticky_pi_ml.image import SVGImage
 from sticky_pi_api.client import LocalClient
 
-
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S',
-                    level=logging.INFO)
+                    datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
+
 
 test_dir = os.path.dirname(__file__)
 
@@ -48,13 +47,13 @@ class TestSIM(unittest.TestCase):
                                                                            "ml_bundles/universal-insect-detector/data",
                                                                            "0a5bb6f4*.svg")))]
 
-    #
-    # def test_trainer(self):
-    #     bndl = MLBundle(self._bundle_dir)
-    #     t = Trainer(bndl)
-    #     t.resume_or_load(resume=True)
-    #     t.train()
-    #
+
+    def test_trainer(self):
+        bndl = MLBundle(self._bundle_dir)
+        t = Trainer(bndl)
+        t.resume_or_load(resume=True)
+        t.train()
+
     # def test_Predictor(self):
     #     bndl = MLBundle(self._bundle_dir)
     #     pred = MockPredictor(bndl)

@@ -26,7 +26,6 @@ class Predictor(BasePredictor):
         self._detectron_predictor = DefaultPredictor(self._ml_bundle.config)
 
     def detect_client(self, info: InfoType = None, *args, **kwargs):
-
         assert issubclass(type(self._ml_bundle), ClientMLBundle), \
             "This method only works for MLBundles linked to a client"
 
@@ -45,29 +44,28 @@ class Predictor(BasePredictor):
 
             df = pd.DataFrame(client_resp)
 
-            if 'algo_name' not in df.columns:
-                logging.info('No annotations for the requested images. fetching all!')
 
+            if 'algo_name' not in df.columns:
+                logging.info('No annotations for the requested images. Fetching all!')
+                conditions = df.id > -1 # just fill with True
+                df['algo_version'] = None
+                df['algo_name'] = ""
+
+            df = df.sort_values(by=['algo_version', 'datetime'])
+            df = df.drop_duplicates(subset=['id'], keep='last')
             # here, we filter/sort df to keep only images that are not annotated by this version.
             # we sort by version tag
-            else:
-                conditions = (self._ml_bundle.version > df.algo_version) | \
-                             (df.algo_version.isnull()) | \
-                             (self._ml_bundle.name != df.algo_name)
-                df = df[conditions].sort_values(by=['algo_version'])
 
+            conditions = (self.version > df.algo_version) | \
+                         (df.algo_version.isnull()) | \
+                         (self.name != df.algo_name)
+
+            df = df[conditions]
             if len(df) == 0:
                 logging.info('All annotations uploaded!')
                 return
 
             query = [df.iloc[i].to_dict() for i in range(min(len(df), self._detect_client_chunk_size))]
-            # print('query')
-            # print(query)
-            # for i, r in df.iterrows():
-            #     query.append(r.to_dict())
-            #     if len(query) == self._detect_client_chunk_size:
-            #         continue
-
             image_data = client.get_images(info=query, what='image')
             urls = [im['url'] for im in image_data]
 
@@ -78,7 +76,8 @@ class Predictor(BasePredictor):
                 logging.info('Detecting in image %s' % im)
                 annots = annotated_im.annotation_dict(as_json=False)
                 all_annots.append(annots)
-                logging.info("Sending annotation to client: %s" % annotated_im)
+                logging.info("Staging annotations: %s" % annotated_im)
+            logging.info("Sending %i annotations to client" % len(all_annots))
             client.put_uid_annotations(all_annots)
 
     def detect(self, image, *args, **kwargs) -> Image:
