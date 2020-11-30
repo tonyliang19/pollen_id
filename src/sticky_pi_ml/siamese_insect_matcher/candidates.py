@@ -22,10 +22,11 @@ def make_candidates(client: LocalClient, out_dir, info=None, every=50, max_delta
                                                          what_annotation='data')
     df = pd.DataFrame(resp)
 
-    df.sort_values(['datetime'])
+    df.sort_values(['datetime'], inplace=True)
 
     for device, sub_df in df.groupby('device'):
-        for i, ri in sub_df.iterrows():
+        for i in range(len(sub_df)):
+            ri = sub_df.iloc[i]
             target_j = random.randint(1, max_delta_t)
             if i % every == 0:
                 logging.info("Match IM0: %s, %s" % (ri.device, ri.datetime))
@@ -34,12 +35,6 @@ def make_candidates(client: LocalClient, out_dir, info=None, every=50, max_delta
                 rj = None
                 for j in range(i, len(sub_df)):
                     rj = sub_df.iloc[j]
-                    logging.info("Trying: %s" % str((
-                        rj.datetime,
-                        (rj.datetime-ri.datetime).total_seconds(),
-                        target_j))
-                                 )
-
                     if (rj.datetime-ri.datetime).total_seconds() > target_j:
                         break
                 if rj is None:
@@ -49,6 +44,7 @@ def make_candidates(client: LocalClient, out_dir, info=None, every=50, max_delta
                 if not ri.json or not rj.json:
                     logging.warning('No annotations')
                     continue
+
                 im0 = ImageJsonAnnotations(ri.url, ri.json)
                 im1 = ImageJsonAnnotations(rj.url, rj.json)
                 logging.info("Candidates Merging %s + %s in %s" % (im0.filename, im1.filename, out_dir))
