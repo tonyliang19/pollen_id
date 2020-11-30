@@ -27,14 +27,17 @@ def make_candidates(client: LocalClient, out_dir, info=None, every=50, max_delta
     for device, sub_df in df.groupby('device'):
         for i, ri in sub_df.iterrows():
             target_j = random.randint(1, max_delta_t)
-
             if i % every == 0:
+                logging.info("Match IM0: %s, %s" % (ri.device, ri.datetime))
+                logging.info("Target: %s" % str(target_j))
+
                 rj = None
                 for j in range(i, len(sub_df)):
                     rj = sub_df.iloc[j]
+                    logging.info("Trying: %s" % str(rj))
                     if (rj.datetime-ri.datetime).total_seconds() < target_j:
                         continue
-                if rj.json is None:
+                if rj is None:
                     continue
                 logging.info("Match IM1: %s, %s" % (rj.device, rj.datetime))
 
