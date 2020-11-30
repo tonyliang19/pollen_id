@@ -41,7 +41,7 @@ def make_candidates(client: LocalClient, out_dir, info=None, every=50, max_delta
                                  )
 
                     if (rj.datetime-ri.datetime).total_seconds() > target_j:
-                        continue
+                        break
                 if rj is None:
                     continue
                 logging.info("Match IM1: %s, %s" % (rj.device, rj.datetime))
