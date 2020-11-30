@@ -7,7 +7,7 @@ from sticky_pi_ml.siamese_insect_matcher.siam_svg import SiamSVG
 from sticky_pi_api.client import LocalClient
 
 
-def make_candidates(client: LocalClient, out_dir, info = None, every=50, max_delta_t:int = 12 * 3600):
+def make_candidates(client: LocalClient, out_dir, info=None, every=50, max_delta_t: int = 12 * 3600):
     random.seed(1234)
 
     assert os.path.isdir(out_dir)
@@ -40,8 +40,6 @@ def make_candidates(client: LocalClient, out_dir, info = None, every=50, max_del
 
                 if not ri.json or not rj.json:
                     logging.warning('No annotations')
-                logging.info(ri.json)
-                logging.info(rj.json)
 
                 im0 = ImageJsonAnnotations(ri.url, ri.json)
                 im1 = ImageJsonAnnotations(rj.url, rj.json)

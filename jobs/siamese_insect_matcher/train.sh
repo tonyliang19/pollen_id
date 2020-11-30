@@ -13,19 +13,21 @@ echo Running "$command"
 
 case "$1" in
         candidates)
-            sbatch --job-name=${JOBNAME}   --account=${SLURM_ACCOUNT}  --cpus-per-task=2 --mem=8000M --time=00-02:00 --output=$output --wrap="${command}"
+            sbatch --job-name="${JOBNAME}" --account="${SLURM_ACCOUNT}"  --cpus-per-task=2 --mem=8000M --time=00-02:00 --output="$output" --wrap="${command}"
            ;;
         fetch| push)
-            sbatch --job-name=${JOBNAME} --account=${SLURM_ACCOUNT} --cpus-per-task=1 --mem=4000M --time=0-05:00 --output=$output --wrap="${command}"
+            sbatch --job-name="${JOBNAME}" --account="${SLURM_ACCOUNT}" --cpus-per-task=1 --mem=4000M --time=0-05:00 --output="$output" --wrap="${command}"
             ;;
        train)
-             sbatch --job-name=${JOBNAME}   --account=${SLURM_ACCOUNT} --gres=gpu:v100l:1 --cpus-per-task=8 --mem=40000M --time=1-00:00 --output=$output --wrap="${command} --gpu"
+             # shellcheck disable=SC2086
+             sbatch --job-name="${JOBNAME}" --account=${SLURM_ACCOUNT} --gres=gpu:v100l:1 --cpus-per-task=8 --mem=40000M --time=1-00:00 --output="$output" --wrap="${command} --gpu"
             ;;
        predict)
-            sbatch --job-name=${JOBNAME}   --account=${SLURM_ACCOUNT} --gres=gpu:p100:1 --cpus-per-task=2 --mem=16000M --time=1-00:00 --output=$output --wrap="${command} --gpu"
+            # shellcheck disable=SC2086
+            sbatch --job-name="${JOBNAME}" --account=${SLURM_ACCOUNT} --gres=gpu:p100:1 --cpus-per-task=2 --mem=16000M --time=1-00:00 --output="$output" --wrap="${command} --gpu"
            ;;
       validate)
-            sbatch --job-name=${JOBNAME}   --account=${SLURM_ACCOUNT} --gres=gpu:p100:1 --cpus-per-task=2 --mem=16000M --time=00-02:00 --output=$output --wrap="${command} --gpu"
+            sbatch --job-name="${JOBNAME}" --account="${SLURM_ACCOUNT}" --gres=gpu:p100:1 --cpus-per-task=2 --mem=16000M --time=00-02:00 --output="$output" --wrap="${command} --gpu"
            ;;
         *)
             echo $"Wrong action"

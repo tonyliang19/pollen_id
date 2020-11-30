@@ -64,7 +64,6 @@ class Trainer(BaseTrainer):
                     new_annot.append(a)
                 im.set_annotations(new_annot)
                 im.to_svg(target)
-                logging.info((gt.filename, o))
             out.extend(o)
         if out_dir is not None:
             with open(os.path.join(out_dir, 'results.json'), 'w') as f:
