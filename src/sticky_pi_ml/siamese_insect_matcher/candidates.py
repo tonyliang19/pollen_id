@@ -34,8 +34,13 @@ def make_candidates(client: LocalClient, out_dir, info=None, every=50, max_delta
                 rj = None
                 for j in range(i, len(sub_df)):
                     rj = sub_df.iloc[j]
-                    logging.info("Trying: %s" % str(rj))
-                    if (rj.datetime-ri.datetime).total_seconds() < target_j:
+                    logging.info("Trying: %s" % str((
+                        rj.datetime,
+                        (rj.datetime-ri.datetime).total_seconds(),
+                        target_j))
+                                 )
+
+                    if (rj.datetime-ri.datetime).total_seconds() > target_j:
                         continue
                 if rj is None:
                     continue
@@ -43,7 +48,7 @@ def make_candidates(client: LocalClient, out_dir, info=None, every=50, max_delta
 
                 if not ri.json or not rj.json:
                     logging.warning('No annotations')
-
+                    continue
                 im0 = ImageJsonAnnotations(ri.url, ri.json)
                 im1 = ImageJsonAnnotations(rj.url, rj.json)
                 logging.info("Candidates Merging %s + %s in %s" % (im0.filename, im1.filename, out_dir))
