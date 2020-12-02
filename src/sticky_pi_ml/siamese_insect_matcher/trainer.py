@@ -1,3 +1,4 @@
+import json
 import os
 import torch
 import torch.nn as nn
@@ -7,6 +8,7 @@ import numpy as np
 from sticky_pi_ml.trainer import BaseTrainer
 from sticky_pi_ml.siamese_insect_matcher.ml_bundle import MLBundle
 from sticky_pi_ml.siamese_insect_matcher.model import SiameseNet
+from sticky_pi_ml.siamese_insect_matcher.predictor import Predictor
 
 
 class Trainer(BaseTrainer):
@@ -73,16 +75,31 @@ class Trainer(BaseTrainer):
 
 
     def train(self):
+        self._net.train()
         if self._config['DEVICE'] == 'cuda':
             self._net = self._net.cuda()
 
         train_loader = self._ml_bundle.dataset.get_torch_data_loader('train')
-        logging.info('N pairs: %i; N_images: %i' %
-                     (len(train_loader.dataset), len(self._ml_bundle.dataset._training_data)))
+        logging.info('N pairs: %i' % len(train_loader.dataset))
 
         self._net.set_step_pretrain_siam()
-        self.train_step(train_loader, self._config['SIAM_BASE_LR'],self._config['SIAM_ROUNDS'], 'Siamese')
+        self.train_step(train_loader, self._config['SIAM_BASE_LR'], self._config['SIAM_ROUNDS'], 'Siamese')
         self._net.set_step_pretrain_fc()
         self.train_step(train_loader,  self._config['DIST_AR_BASE_LR'], self._config['DIST_AR_ROUNDS'], 'Dist AR')
         self._net.set_step_train_fine_tune()
         self.train_step(train_loader,  self._config['FINAL_BASE_LR'],  self._config['FINAL_ROUNDS'], 'FULL')
+
+    def validate(self, predictor: Predictor, out_dir: str = None):
+
+        dl = self._ml_bundle.dataset.get_torch_data_loader('val', shuffle=False)
+        out = []
+
+        for i, (data, label) in enumerate(dl, 0):
+
+            f = predictor.match_torch_batch(data)
+            # label = label.float().squeeze_()
+            for pred, gt in zip(f.detach().numpy().flatten(), label.detach().numpy().flatten()):
+                print(round(pred, 2), gt)
+                out.append({'pred':float(pred), 'gt':float(gt)})
+        with open(os.path.join(out_dir, 'result.json'), 'w') as file:
+            file.write(json.dumps(out))

@@ -70,18 +70,19 @@ class Predictor(BasePredictor):
         delta_t = (a1.datetime - a0.datetime).total_seconds()
         if delta_t <= 0 or delta_t > self._max_delta_t:
             return 0.0
+        with torch.no_grad():
+            d = DataEntry(a0, a1, arr1, n_pairs, net_for_cache=self._net)
+            score, conv0, conv1, conv0_1 = self._net(d.as_dict(add_dim=True))
+            if cache_conv_a0 and self._net not in a0.cached_conv:
+                a0.set_cached_conv(self._net, conv0)
+            if cache_conv_a0_im1 and (self._net, a1.datetime) not in a0.cached_conv:
+                a0.set_cached_conv((self._net, a1.datetime), conv0_1)
 
-        d = DataEntry(a0, a1, arr1, n_pairs, net_for_cache=self._net)
-        score, conv0, conv1, conv0_1 = self._net(d.as_dict(add_dim=True))
-        if cache_conv_a0 and self._net not in a0.cached_conv:
-            a0.set_cached_conv(self._net, conv0)
-        if cache_conv_a0_im1 and (self._net, a1.datetime) not in a0.cached_conv:
-            a0.set_cached_conv((self._net, a1.datetime), conv0_1)
+            if cache_conv_a1 and self._net not in a1.cached_conv:
+                a1.set_cached_conv(self._net, conv1)
 
-        if cache_conv_a1 and self._net not in a1.cached_conv:
-            a1.set_cached_conv(self._net, conv1)
+            score = score.item()
 
-        score = score.item()
         if score < score_threshold:
             score = 0.0
         return score

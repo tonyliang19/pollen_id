@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import cv2
@@ -6,8 +7,8 @@ import datetime
 from xml.etree import ElementTree
 import numpy as np
 from sticky_pi_ml.annotations import Annotation, DictAnnotation
-# from sticky_pi.tools import device_datetime_from_filename
-import re
+from sticky_pi_api.client import BaseClient
+
 from ast import literal_eval
 import logging
 import tempfile
@@ -20,8 +21,53 @@ import shutil
 from cairosvg import svg2png
 import svgpathtools
 from sticky_pi_ml.utils import md5
+from sticky_pi_api.utils import datetime_to_string, string_to_datetime
+from typing import Union
+
 
 # import ffmpeg
+
+
+class ImageSeries(list):
+    def __init__(self, device: str, start_datetime: Union[str, datetime.datetime],
+                 end_datetime: Union[str, datetime.datetime]):
+        super().__init__()
+        self._device = device
+
+        if not isinstance(start_datetime, datetime.datetime):
+            start_datetime = string_to_datetime(start_datetime)
+
+        if not isinstance(end_datetime, datetime.datetime):
+            end_datetime = string_to_datetime(end_datetime)
+
+        self._start_datetime = start_datetime
+        self._end_datetime = end_datetime
+
+    def __repr__(self):
+        return self.name
+
+    @property
+    def name(self):
+        return "%s.%s.%s" % (self._device,
+                             datetime_to_string(self._start_datetime),
+                             datetime_to_string(self._end_datetime))
+
+    def populate_from_client(self, client: BaseClient):
+        image_data = client.get_images_with_uid_annotations_series([{'device': self._device,
+                                                                     'start_datetime': self._start_datetime,
+                                                                     'end_datetime': self._end_datetime}],
+                                                                   what_annotation='data',
+                                                                   what_image='image')
+        annotated_images = []
+        for i in image_data:
+            if i['json']:
+                im = ImageJsonAnnotations(i['url'], json_str=i['json'])
+                annotated_images.append(im)
+
+        self.clear()
+        for im in sorted(annotated_images, key=lambda x: x.datetime):
+            self.append(im)
+
 
 # def wrapper_make_png(x):
 #     tmp_dir,i, im, show_datetime, scale = x
@@ -125,7 +171,8 @@ class Image(object):
 
     def annotation_dict(self, as_json=True):
         try:
-            metadata_to_pass = {k: self._metadata[k] for k in ['device', 'datetime','algo_name', 'algo_version', 'md5']}
+            metadata_to_pass = {k: self._metadata[k] for k in
+                                ['device', 'datetime', 'algo_name', 'algo_version', 'md5']}
 
         except KeyError:
             meta_to_pass = {}
@@ -176,13 +223,13 @@ class Image(object):
     def filename(self):
         return self._filename
 
-    def clear_cache(self, clear_annot_cached_conv = True):
+    def clear_cache(self, clear_annot_cached_conv=True):
         self._cached_image = None
-        if clear_annot_cached_conv :
+        if clear_annot_cached_conv:
             for a in self._annotations:
                 a.clear_cached_conv()
 
-    def read(self, cache = False):
+    def read(self, cache=False):
         if self._cached_image is None:
             im = self._get_array()
         else:
@@ -299,9 +346,9 @@ class Image(object):
     #
     #     filename = os.path.basename(path)
     #     device, date_time = device_datetime_from_filename(filename)
-        #
-        # return {'device': device,
-        #         'datetime': date_time}
+    #
+    # return {'device': device,
+    #         'datetime': date_time}
 
 
 class SVGImage(Image):
@@ -317,8 +364,6 @@ class SVGImage(Image):
 
         self.update(self._device_datetime_info(self._filename))
         self['md5'] = md5(self.extract_jpeg(as_buffer=True))
-
-
 
     def _img_buffer(self):
         encoded_string = base64.b64encode(self.extract_jpeg(as_buffer=True).read())
@@ -421,12 +466,13 @@ class SVGImage(Image):
 
             # these should be ~ 0 as previous points end where following start
 
-            sum_magnitude = np.sum(np.abs( starts - ends))
+            sum_magnitude = np.sum(np.abs(starts - ends))
             # sometimes, we have small numerical difference (1e-16) or so
             if sum_magnitude > 1e-3:
                 raise Exception('SVG path interrupted %s' % str(path))
-            flat = arr[:, 0:n_point_per_segment-1].flatten()
-            ctr = np.round(np.array([[flat.real / self._scale_in_svg[0], flat.imag / self._scale_in_svg[1]]])).astype(int)
+            flat = arr[:, 0:n_point_per_segment - 1].flatten()
+            ctr = np.round(np.array([[flat.real / self._scale_in_svg[0], flat.imag / self._scale_in_svg[1]]])).astype(
+                int)
             ctr = ctr.transpose((2, 0, 1))
             # ignore contours that do not have 3 points
             if ctr.shape[0] > 2:
@@ -451,13 +497,12 @@ class SVGImage(Image):
             raise Exception("Cannot extract image from %s" % target)
         return self._extract_jpeg_id(ims, 0, target, as_buffer)
 
-
-    def _extract_jpeg_id(self, ims, id=0, target=None, as_buffer = False):
+    def _extract_jpeg_id(self, ims, id=0, target=None, as_buffer=False):
         utf_str = ims[id].attrib['{http://www.w3.org/1999/xlink}href'].split(',')[1]
         utf_str = utf_str.strip('\"\'')
 
         if as_buffer:
-            import io
+
             buffer = io.BytesIO()
             buffer.write(base64.b64decode(utf_str))
             buffer.seek(0)
@@ -487,16 +532,44 @@ class ArrayImage(Image):
         self._shape = self._array.shape
         return self._array
 
+class BufferImage(Image):
+    def __init__(self, buffer, device, datetime):
+        self._buffer = buffer
+        self._array = None
+        self._device = device
+        self._datetime = datetime
+        self._path = None
+        self._filename = None
+        self._annotations = []
+        self._metadata = {}
+        self._shape = None
+        self._cached_image = None
+        self._md5 = None
+
+    def filename(self):
+        raise NotImplementedError
+
+    def read(self, cache=True):
+        if self._array is not None:
+            return self._array
+        self._buffer.seek(0)
+        bytes_as_np_array = np.frombuffer(self._buffer.read(), dtype=np.uint8)
+        array = cv2.imdecode(bytes_as_np_array, cv2.IMREAD_COLOR)
+
+        if cache:
+            self._array = array
+        self._shape = array.shape
+        return array
 
 class ImageJsonAnnotations(Image):
-    def __init__(self, path, json_str = None,  json_path=None):
+    def __init__(self, path, json_str=None, json_path=None):
         super().__init__(path)
         if json_path is None and json_str is None:
             raise Exception("json must be provided, either as a string or path")
 
         if json_path is not None:
             assert os.path.isfile(json_path)
-            dic = json.load(open(json_path,'r'))
+            dic = json.load(open(json_path, 'r'))
         elif json_str is not None:
             dic = json.loads(json_str)
         else:
@@ -508,5 +581,3 @@ class ImageJsonAnnotations(Image):
 
         for ad in annot_dic_list:
             self._annotations.append(DictAnnotation(ad, parent_image=self))
-
-

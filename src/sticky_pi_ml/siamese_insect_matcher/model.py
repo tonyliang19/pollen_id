@@ -22,8 +22,9 @@ class SiameseNet(nn.Module):
         )
         self.liner = nn.Sequential(nn.Linear(9216, 4096))
         self.siam_out = nn.Sequential(nn.Linear(4096, 1), nn.Sigmoid())
-        self.sim_fc = nn.Sequential(nn.Linear(5, 4), nn.ReLU(), nn.Linear(4, 3), nn.ReLU(),
-                                    nn.Linear(3, 1), nn.Sigmoid())
+        self.sim_fc = nn.Sequential(nn.Linear(6, 4), nn.ReLU(),
+                                    # nn.Linear(4, 3), nn.ReLU(),
+                                    nn.Linear(4, 1), nn.Sigmoid())
 
         self._step = ""
 
@@ -36,99 +37,72 @@ class SiameseNet(nn.Module):
     def set_step_train_fine_tune(self):
         self._step = "train_full"
 
-    def conv_branch(self, x):
+    def _conv_branch(self, x):
         x = self.conv(x)
         x = x.view(x.size()[0], -1)
         x = self.liner(x)
         return x
 
-    def pretrain_siamese(self, data):
-        x0 = self.conv_branch(data['x0'])
-        x1 = self.conv_branch(data['x1'])
+    def _pretrain_siamese(self, data):
+        x0 = self._conv_branch(data['x0'])
+        x1 = self._conv_branch(data['x1'])
         d0_1 = self.siam_out(torch.abs(x0 - x1))
         return d0_1
 
-    def pretrain_fully_connected_part(self, data):
+    def _pretrain_fully_connected_part(self, data):
         with torch.no_grad():
-            x0 = self.conv_branch(data['x0'])
-            x1 = self.conv_branch(data['x1'])
-            n_in_batch = data['ar'].shape[0]
-            x1_a0 = self.conv_branch(data['x1_a0'])
-            d0_1a0 = self.siam_out(torch.abs(x0 - x1_a0))
-            d0_1 = self.siam_out(torch.abs(x0 - x1))
+            d0_1, d0_1a0, x0, x1, x1_a0 = self._image_distances(data)
 
-        ar = data['ar'].to(torch.float32).reshape((n_in_batch, 1))
-        area_0 = data['area_0'].to(torch.float32).reshape((n_in_batch, 1))
-        d = data['log_d'].to(torch.float32).reshape((n_in_batch, 1))
-        dissim_data = torch.cat((d0_1, d0_1a0, ar, d, area_0), 1)
 
-        out = self.sim_fc(dissim_data)
-        return out
-
-    def train_full(self, data):
-        n_in_batch = data['ar'].shape[0]
-        try:
-            x0 = data['c0']
-        except KeyError:
-            x0 = self.conv_branch(data['x0'])
-        try:
-            x1 = data['c1']
-        except KeyError:
-            x1 = self.conv_branch(data['x1'])
-
-        with torch.no_grad():
-            x1_a0 = self.conv_branch(data['x1_a0'])
-            d0_1a0 = self.siam_out(torch.abs(x0 - x1_a0))
-
-        d0_1 = self.siam_out(torch.abs(x0 - x1))
-
-        area_0 = data['area_0'].to(torch.float32).reshape((n_in_batch, 1))
-        ar = data['ar'].to(torch.float32).reshape((n_in_batch, 1))
-        d = data['log_d'].to(torch.float32).reshape((n_in_batch, 1))
-        dissim_data = torch.cat((d0_1, d0_1a0, ar, d, area_0), 1)
-        out = self.sim_fc(dissim_data)
+        out = self._fc(data, d0_1, d0_1a0)
 
         return out
 
-    def fast_inference(self, data):
-        n_in_batch = data['ar'].shape[0]
-
+    def _image_distances(self, data):
         try:
             x0 = data['c0']
         except KeyError:
-            x0 = self.conv_branch(data['x0'])
+            x0 = self._conv_branch(data['x0'])
         try:
             x1 = data['c1']
         except KeyError:
-            x1 = self.conv_branch(data['x1'])
+            x1 = self._conv_branch(data['x1'])
 
         try:
             x1_a0 = data['c1_0']
         except KeyError:
-            x1_a0 = self.conv_branch(data['x1_a0'])
+            x1_a0 = self._conv_branch(data['x1_a0'])
 
         d0_1a0 = self.siam_out(torch.abs(x0 - x1_a0))
         d0_1 = self.siam_out(torch.abs(x0 - x1))
-        ar = data['ar'].to(torch.float32).reshape((n_in_batch, 1))
-        area_0 = data['area_0'].to(torch.float32).reshape((n_in_batch, 1))
-        d = data['log_d'].to(torch.float32).reshape((n_in_batch, 1))
-        dissim_data = torch.cat((d0_1, d0_1a0, ar, d, area_0), 1)
+        return d0_1, d0_1a0, x0, x1, x1_a0
+
+    def _fc(self, data, d0_1, d0_1a0):
+
+        ar = data['ar'].to(torch.float32).flatten().unsqueeze(1)
+        d = data['log_d'].to(torch.float32).flatten().unsqueeze(1)
+        area_0 = data['area_0'].to(torch.float32).flatten().unsqueeze(1)
+        t = data['t'].to(torch.float32).flatten().unsqueeze(1)
+        dissim_data = torch.cat((d0_1, d0_1a0, ar, d, area_0, t), 1)
         out = self.sim_fc(dissim_data)
+        return out
+
+    def _train_full(self, data):
+        d0_1, d0_1a0, x0, x1, x1_a0 = self._image_distances(data)
+        out = self._fc(data, d0_1, d0_1a0)
+        return out
+
+    def _fast_inference(self, data):
+        d0_1, d0_1a0, x0, x1, x1_a0 = self._image_distances(data)
+        out = self._fc(data, d0_1, d0_1a0)
         return out, x0, x1, x1_a0
 
     def forward(self, data):
         if self._step == 'pretrain_siamese':
-            return self.pretrain_siamese(data)
+            return self._pretrain_siamese(data)
         elif self._step == 'pretrain_fc':
-            return self.pretrain_fully_connected_part(data)
+            return self._pretrain_fully_connected_part(data)
         elif self._step == 'train_full':
-            return self.train_full(data)
+            return self._train_full(data)
         else:
-            return self.fast_inference(data)
-
-
-
-
-
-
-
+            return self._fast_inference(data)

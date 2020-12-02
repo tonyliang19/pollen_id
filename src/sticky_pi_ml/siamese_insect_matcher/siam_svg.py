@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import io
 from xml.etree import ElementTree
-from sticky_pi_ml.image import SVGImage, ArrayImage, Image
+from sticky_pi_ml.image import SVGImage, BufferImage, Image
 from sticky_pi_ml.annotations import Annotation
 from sticky_pi_ml.utils import iou, iou_match_pairs
 from shapely.geometry import Polygon
@@ -215,8 +215,10 @@ class SiamSVG(SVGImage):
 
         svg_im_shape = (int(im_h), int(im_w))
 
-        a0 = self._get_one_image(ims[0])
-        a1 = self._get_one_image(ims[1])
+        a0, b0 = self._get_one_image(ims[0])
+        a1, b1 = self._get_one_image(ims[1])
+
+
         if ims[1].attrib['y'] < ims[1].attrib['y']:
             a1, a0 = a0, a1
 
@@ -228,8 +230,8 @@ class SiamSVG(SVGImage):
         dt0 = datetime.datetime.strptime(dtstr0, '%Y-%m-%d_%H-%M-%S')
         dt1 = datetime.datetime.strptime(dtstr1, '%Y-%m-%d_%H-%M-%S')
 
-        self._im0 = ArrayImage(a0, device=device, datetime=dt0)
-        self._im1 = ArrayImage(a1, device=device, datetime=dt1)
+        self._im0 = BufferImage(b0, device=device, datetime=dt0)
+        self._im1 = BufferImage(b1, device=device, datetime=dt1)
         self._device = device
         self._metadata = None
 
@@ -240,14 +242,17 @@ class SiamSVG(SVGImage):
             raise Exception("Unexpected number of images in %s" % self._path)
         return self._extract_jpeg_id(ims, id, target, as_buffer)
 
-    def _get_one_image(self, im):
+    def _get_buffer(self, im):
         utf_str = im.attrib['{http://www.w3.org/1999/xlink}href'].split(',')[1]
         utf_str = utf_str.strip('\"\'')
 
         buffer = io.BytesIO()
         buffer.write(base64.b64decode(utf_str))
         buffer.seek(0)
+        return buffer
 
+    def _get_one_image(self, im):
+        buffer = self._get_buffer(im)
         bytes_as_np_array = np.frombuffer(buffer.read(), dtype=np.uint8)
         img = cv2.imdecode(bytes_as_np_array, cv2.IMREAD_COLOR)
-        return img
+        return img, buffer

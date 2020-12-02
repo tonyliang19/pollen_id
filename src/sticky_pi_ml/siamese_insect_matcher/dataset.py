@@ -1,3 +1,6 @@
+import copy
+import joblib
+from joblib import Parallel, delayed
 import glob
 from math import log10
 import os
@@ -15,7 +18,7 @@ from sticky_pi_ml.siamese_insect_matcher.siam_svg import SiamSVG
 from sticky_pi_ml.siamese_insect_matcher.model import SiameseNet
 from sticky_pi_ml.utils import pad_to_square, detectron_to_pytorch_transform, iou, md5
 import random
-
+from io import BytesIO
 from typing import List
 
 to_tensor_tr = ToTensor()
@@ -27,7 +30,7 @@ class DataEntry(object):
 
     def __init__(self, a0: Annotation,
                  a1: Annotation,
-                 im1: np.ndarray, n_pairs:int,
+                 im1: np.ndarray, n_pairs: int,
                  data_transforms=None, dist_transform=None,
                  # a hash of the net used and to cache the result of convolution,
                  # when mathching all against all, we really don';t need to comput the full convolution for each layer!
@@ -64,9 +67,12 @@ class DataEntry(object):
         dist = abs(a0.center - a1.center)
         if dist_transform is not None:
             dist = dist_transform(dist)
-
         dist = log10(dist + 1)
+
         self._log_dist = torch.Tensor([dist])
+
+        self._delta_t = torch.Tensor([abs(float((a1.datetime - a0.datetime).total_seconds()) / 60.0)])
+
         self._n_pairs = None
 
         if n_pairs is not None:
@@ -87,6 +93,7 @@ class DataEntry(object):
                'log_d': self._log_dist,
                'ar': self._ar,
                'area_0': self._area_0,
+               't': self._delta_t
                }
 
         if add_dim:
@@ -143,7 +150,11 @@ class OurTorchDataset(TorchDataset):
         else:
             entry = self._positive_data_pairs[item]
 
+        entry = copy.deepcopy(entry)
+        entry['data']['im1'] = entry['data']['a1'].parent_image.read(cache=False)
+
         out = DataEntry(**entry['data'], data_transforms=self._transforms, dist_transform=self._dist_transform)
+
         return out.as_dict(), entry['label']
 
     def __iter__(self):
@@ -151,12 +162,11 @@ class OurTorchDataset(TorchDataset):
             yield self._get_one(i)
 
     def __getitem__(self, item, prob_neg=0.50):
-        if random.random() < prob_neg:
-            return self._get_one(random.randint(0, len(self._negative_data_pairs)))
+        if random.random() > prob_neg:
+            # positives
+            return self._get_one(random.randint(0, len(self._positive_data_pairs)))
         else:
             return self._get_one(random.randint(len(self._positive_data_pairs), self.__len__()))
-
-
 
     def __len__(self):
         return len(self._negative_data_pairs) + len(self._positive_data_pairs)
@@ -177,19 +187,22 @@ class Dataset(BaseDataset):
             if entry['md5'] > self._md5_max_training:
                 self._validation_data.append(entry)
             else:
-                self._training_data.append(entry)
-        # print(len(self._training_data))
-        # print(len(self._val_data))
+                        self._training_data.append(entry)
 
     def _serialise_imgs_to_dicts(self, input_img_list: List[str]):
-        pos_pairs = []
-        neg_pairs = []
-        iou_max_n_discarded = 0
 
-        for s in sorted(input_img_list):
-            logging.info('Serializing: %s' % os.path.basename(s))
-            ssvg = SiamSVG(s)
-            md5_sum = md5(s)
+        mem = joblib.Memory(location=self._cache_dir, verbose=False)
+
+        @mem.cache
+        def cached_serialise(path, mtime):
+            pos_pairs = []
+            neg_pairs = []
+            iou_max_n_discarded = 0
+
+            ssvg = SiamSVG(path)
+            print('Serializing: %s. N_pairs = %i ' % (os.path.basename(path), len(ssvg.annotation_pairs)))
+
+            md5_sum = md5(path)
             a0_annots = []
             a1_annots = []
             for a0, a1 in ssvg.annotation_pairs:
@@ -197,14 +210,15 @@ class Dataset(BaseDataset):
                 a1_annots.append(a1)
 
             for i, a0 in enumerate(a0_annots):
-                for j, a1 in enumerate(a1_annots):
-                    im1 = a1.parent_image.read()
 
+                for j, a1 in enumerate(a1_annots):
+                    # im1 = a1.parent_image.read()
                     if i < j:
                         continue
 
                     iou_val = iou(a0.polygon, a1.polygon)
-                    data = {'a0': a0, 'a1': a1, 'im1': im1, 'n_pairs': len(ssvg.annotation_pairs)}
+
+                    data = {'a0': a0, 'a1': a1, 'n_pairs': len(ssvg.annotation_pairs)}
                     if iou_val > self._max_iou:
                         iou_max_n_discarded += 1
                         continue
@@ -213,19 +227,25 @@ class Dataset(BaseDataset):
                     else:
                         neg_pairs.append({'data': data, 'label': 0, 'md5': md5_sum})
 
+            return pos_pairs, neg_pairs, iou_max_n_discarded
+
+        results = Parallel(n_jobs=self._config['N_WORKERS'])(
+            delayed(cached_serialise)(s, os.path.getmtime(s)) for s in sorted(input_img_list)
+        )
+        # results = [cached_serialise(s, os.path.getmtime(s)) for s in sorted(input_img_list)]
+        pos_pairs = []
+        neg_pairs = []
+        iou_max_n_discarded = 0
+
+        for p, n, i in results:
+            pos_pairs += p
+            neg_pairs += n
+            iou_max_n_discarded += i
+
         logging.info('Serialized: %i positive and %i negative. Discarded %i matches with iou>max_iou' %
                      (len(pos_pairs), len(neg_pairs), iou_max_n_discarded))
         return pos_pairs + neg_pairs
 
-        # n_neg = int(prob_neg * len(pos_pairs) / (1-prob_neg))
-        # n_neg = min(len(neg_pairs), n_neg)
-        # neg_pairs = random.sample(neg_pairs, n_neg)
-        # selected_pairs = pos_pairs + neg_pairs
-        # random.shuffle(selected_pairs)
-        # out = []
-        # for a0, a1, im1, score, lp in selected_pairs:
-        #     out.append(DataEntry(a0, a1, im1, score, lp, self._transforms, self._dist_transform))
-        # DataEntry(a0, a1, im1, score, lp, self._transforms, self._dist_transform)
 
     def get_torch_data_loader(self, subset='train', shuffle=True):
         assert subset in {'train', 'val'}, 'subset should be either "train" or "val"'
