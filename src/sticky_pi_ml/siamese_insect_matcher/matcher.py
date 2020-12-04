@@ -202,7 +202,7 @@ class Matcher(object):
         def col_lut(id):
             np.random.seed(id)
             gr = np.round(np.random.random(2) * 255).astype(int).tolist()
-            return 255, *gr
+            return 255, gr[0], gr[1]
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         vw = cv2.VideoWriter(out, fourcc, fps, (scale[0], scale[1]))
