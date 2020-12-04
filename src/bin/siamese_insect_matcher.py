@@ -1,14 +1,33 @@
+import logging
 import os
-
 from sticky_pi_ml.utils import MLScriptParser
 from sticky_pi_api.client import LocalClient #, RemoteClient
 from sticky_pi_ml.siamese_insect_matcher.ml_bundle import ClientMLBundle
 from sticky_pi_ml.siamese_insect_matcher.trainer import Trainer
 from sticky_pi_ml.siamese_insect_matcher.predictor import Predictor
+from sticky_pi_ml.siamese_insect_matcher.matcher import Matcher
 from sticky_pi_ml.siamese_insect_matcher.candidates import make_candidates
+from sticky_pi_ml.image import ImageSeries
 
 BUNDLE_NAME = 'siamese-insect-matcher'
 CANDIDATE_DIR = "candidates"
+PREDICT_VIDEO_DIR = "videos"
+VALIDATION_OUT_DIR = 'validation_results'
+
+
+def make_series(i: int):
+    import pandas as pd
+    csv_file = '../series.csv'
+    df = pd.read_csv(csv_file)
+    assert 'device' in df.columns
+    assert 'start_datetime' in df.columns
+    assert 'end_datetime' in df.columns
+    df = df[['device', 'start_datetime', 'end_datetime']]
+    if i is None:
+        return [ImageSeries(**r) for r in df.to_dict('records')]
+    else:
+        assert i < len(df)
+        return [ImageSeries(**df.iloc[i].to_dict())]
 
 if __name__ == '__main__':
     parser = MLScriptParser()
@@ -35,7 +54,12 @@ if __name__ == '__main__':
         raise NotImplementedError
 
     elif option_dict['action'] == 'validate':
-        raise NotImplementedError
+        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
+        t = Trainer(ml_bundle)
+        predictor = Predictor(ml_bundle)
+        t.validate(predictor, VALIDATION_OUT_DIR)
+
 
     elif option_dict['action'] == 'train':
         client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
@@ -44,11 +68,21 @@ if __name__ == '__main__':
         t.resume_or_load(resume=not option_dict['restart_training'])
         t.train()
 
-    # elif option_dict['action'] == 'predict':
-    #     client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
-    #     ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
-    #     pred = Predictor(ml_bundle)
-    #
+    elif option_dict['action'] == 'predict':
+        # this is to analyse series in a slurm job aray
+        os.makedirs(PREDICT_VIDEO_DIR, exist_ok=True)
+        try:
+            i = int(os.getenv('SLURM_ARRAY_TASK_ID'))
+            series = make_series(i)
+        except (TypeError, ValueError) as e:
+            logging.warning('No environment variable named SLURM_ARRAY_TASK_ID. Making series in order instead!')
+            series = make_series(None)
+
+        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
+        matcher = Matcher(ml_bundle)
+        for s in series:
+            out = matcher.match_client(s, video_dir= PREDICT_VIDEO_DIR)
 
     elif option_dict['action'] == 'push':
         #todo use remote client here

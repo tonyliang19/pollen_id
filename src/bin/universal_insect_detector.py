@@ -8,10 +8,10 @@ from sticky_pi_ml.universal_insect_detector.predictor import Predictor
 
 BUNDLE_NAME = 'universal-insect-detector'
 VALIDATION_OUT_DIR = 'validation_results'
+
 if __name__ == '__main__':
     parser = MLScriptParser()
     option_dict = parser.get_opt_dict()
-
     bundle_dir = os.path.join(option_dict['BUNDLE_ROOT_DIR'], BUNDLE_NAME)
     ml_bundle_cache = os.path.join(bundle_dir,'.cache')
     os.makedirs(ml_bundle_cache, exist_ok=True)
