@@ -1,18 +1,19 @@
 import copy
-import tempfile
-import shutil
 import os
 import cv2
 import numpy as np
 from sticky_pi_ml.utils import pad_to_square
 from sticky_pi_ml.annotations import Annotation
 from sticky_pi_ml.image import ImageSeries
-from sticky_pi_api.utils import string_to_datetime, datetime_to_string
+from sticky_pi_api.utils import string_to_datetime
 from typing import List
 
 
 class Tuboid(list):
-    def __init__(self, annotations: List[Annotation] = None, parent_series: ImageSeries = None):
+    def __init__(self, annotations: List[Annotation],
+                 matcher_version: str,
+                 parent_series: ImageSeries = None):
+
         if annotations is None:
             annotations = []
 
@@ -29,6 +30,7 @@ class Tuboid(list):
         self._parent_series = parent_series
         self._device = d
         self._id = -1
+        self._matcher_version = matcher_version
         self._all_timestamps = [a.datetime.timestamp() for a in self]
         self._all_timestamps = np.array(self._all_timestamps).astype(np.float)
         self._all_bboxes = np.array([a.bbox for a in self]).astype(np.float)
@@ -50,6 +52,10 @@ class Tuboid(list):
     @property
     def id(self):
         return self._id
+
+    @property
+    def matcher_version(self):
+        return self._matcher_version
 
     @property
     def parent_series(self):
@@ -125,12 +131,16 @@ class TiledTuboid(list):
         super().__init__()
         self._tuboid_dir = os.path.normpath(tuboid_dir)
 
-        self._device, self._start_datetime, self._end_datetime, self._tuboid_id = os.path.basename(self._tuboid_dir).split(
-            '.')
+        self._device, series_start_datetime, series_end_datetime, self._matcher_version,  self._tuboid_id = \
+            os.path.basename(self._tuboid_dir).split('.')
 
-        self._start_datetime = string_to_datetime(self._start_datetime)
-        self._end_datetime = string_to_datetime(self._end_datetime)
-        self._tuboid_id = int(self._tuboid_id)
+        self._parent_series = ImageSeries(device=self._device, start_datetime=series_start_datetime,
+                                          end_datetime=series_end_datetime)
+        self._id = int(self._tuboid_id)
+
+        first_shot_datetime = None
+
+        self._n_tiles = 0
 
         with open(os.path.join(self._tuboid_dir, self._metadata_tuboid_filename), 'r') as f:
             while True:
@@ -139,17 +149,27 @@ class TiledTuboid(list):
                     break
                 prefix, center_real, center_imag, scale = line.split(',')
                 device, annotation_datetime = prefix.split('.')
+                annotation_datetime = string_to_datetime(annotation_datetime)
                 assert device == self._device
-                datetime = string_to_datetime(annotation_datetime)
+                if first_shot_datetime is None:
+                    first_shot_datetime = annotation_datetime
+                if (annotation_datetime - first_shot_datetime).total_seconds() <= self._max_tuboid_duration:
+                    self._n_tiles += 1
                 center = float(center_real) + 01j * float(center_imag)
                 scale = float(scale)
-                o = {'datetime': datetime, 'center': center, 'scale': scale}
-                if (datetime - self._start_datetime).total_seconds() > self._max_tuboid_duration:
-                    break
+                o = {'datetime': annotation_datetime, 'center': center, 'scale': scale}
                 self.append(o)
 
+    @property
+    def directory(self):
+        return self._tuboid_dir
+
+    def iter_tiles(self):
+        for i in range(self._n_tiles):
+            yield self.get_tile(i)
+
     def get_tile(self, item: int) -> np.ndarray:
-        assert item < len(self)
+        assert item < self._n_tiles
         row = item // 4
         col = item % 4
         im = cv2.imread(os.path.join(self._tuboid_dir, self._tiles_tuboid_filename))
@@ -161,40 +181,40 @@ class TiledTuboid(list):
         out['array'] = tile
         return out
 
-
-
     @classmethod
-    def from_tuboid(cls, tuboid: Tuboid, output_dir: str):
+    def from_tuboid(cls, tuboid: Tuboid, tuboid_root_dir: str):
 
         assert tuboid.parent_series is not None
-        assert os.path.isdir(output_dir)
+        assert os.path.isdir(tuboid_root_dir)
 
         tile_width = cls._tile_width
 
-        series_id = tuboid.parent_series.name
+        series_id = tuboid.parent_series.name + '.' + tuboid.matcher_version
         tuboid_dir = "%s.%04d" % (series_id, tuboid.id)
         # tempdir = tempfile.mkdtemp()
 
-        tuboid_dir = os.path.join(output_dir, tuboid_dir)
-        os.makedirs(tuboid_dir)
-        n_img = len(tuboid)
-        n_rows = 1 + (n_img - 1) // 4
-        out_array = np.zeros((n_rows * tile_width, tile_width * 4, 3), dtype=np.uint8)
+        tuboid_dir = os.path.join(tuboid_root_dir, series_id, tuboid_dir)
+        os.makedirs(tuboid_dir, exist_ok=True)
 
+        # we only save the first day of images
+        images_to_save = []
         metadata_lines = []
         for i, (im, par_im, scale, center) in enumerate(tuboid.all_annotation_sub_images(scale_width=tile_width)):
+            prefix = os.path.splitext(par_im.filename)[0]
+            metadata_lines.append("%s,%f,%f,%f\n" % (prefix, center.real, center.imag, scale))
+            if (tuboid[i].datetime - tuboid.head_datetime).total_seconds() <= cls._max_tuboid_duration:
+                images_to_save.append(im)
+
+        n_to_save = len(images_to_save)
+        n_rows = 1 + (n_to_save - 1) // 4
+        out_array = np.zeros((n_rows * tile_width, tile_width * 4, 3), dtype=np.uint8)
+
+        for i, im in enumerate(images_to_save):
             row = i // 4
             col = i % 4
             out_array[row * cls._tile_width: row * cls._tile_width + cls._tile_width,
                       col * cls._tile_width: col * cls._tile_width + cls._tile_width,
                       :] = im
-
-            prefix = os.path.splitext(par_im.filename)[0]
-            metadata_lines.append("%s,%f,%f,%f\n" % (prefix, center.real, center.imag, scale))
-            if (tuboid[i].datetime - tuboid.head_datetime).total_seconds() > cls._max_tuboid_duration:
-                break
-
-
 
         arr = np.copy(tuboid.head.parent_image_array(cache=False))
         bbox = tuboid.head.bbox
@@ -206,11 +226,11 @@ class TiledTuboid(list):
         with open(os.path.join(tuboid_dir, cls._metadata_tuboid_filename), 'w') as f:
             f.writelines(metadata_lines)
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 100]
-        cv2.imwrite(os.path.join(tuboid_dir, cls._context_tuboid_filename), out_array,
+        cv2.imwrite(os.path.join(tuboid_dir, cls._tiles_tuboid_filename), out_array,
                     params=encode_param)
 
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
-        cv2.imwrite(os.path.join(tuboid_dir, cls._tiles_tuboid_filename), arr,
+        cv2.imwrite(os.path.join(tuboid_dir, cls._context_tuboid_filename), arr,
                     params=encode_param)
 
         return TiledTuboid(tuboid_dir)

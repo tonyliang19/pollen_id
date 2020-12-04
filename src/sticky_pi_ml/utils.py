@@ -93,6 +93,7 @@ def detectron_to_pytorch_transform(Class):
             return self.get_transform(*args, **kwargs).apply_image(*args, **kwargs).copy()
     return MyClass
 
+
 class MLScriptParser(argparse.ArgumentParser):
     _valid_actions = {'fetch', 'train', 'qc', 'validate', 'push', 'predict', 'candidates'}
     _required_env_vars = ['BUNDLE_ROOT_DIR', 'LOCAL_CLIENT_DIR']

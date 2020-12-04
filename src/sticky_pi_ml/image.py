@@ -1,14 +1,15 @@
+"""
+
+"""
+
+
 import io
 import json
 import os
 import cv2
-import pytz
 import datetime
 from xml.etree import ElementTree
 import numpy as np
-from sticky_pi_ml.annotations import Annotation, DictAnnotation
-from sticky_pi_api.client import BaseClient
-
 from ast import literal_eval
 import logging
 import tempfile
@@ -17,15 +18,14 @@ import PIL
 import PIL.Image
 import PIL.ExifTags
 import shutil
-
 from cairosvg import svg2png
 import svgpathtools
-from sticky_pi_ml.utils import md5
-from sticky_pi_api.utils import datetime_to_string, string_to_datetime
 from typing import Union
 
-
-# import ffmpeg
+from sticky_pi_api.utils import datetime_to_string, string_to_datetime
+from sticky_pi_api.client import BaseClient
+from sticky_pi_ml.annotations import Annotation, DictAnnotation
+from sticky_pi_ml.utils import md5
 
 
 class ImageSeries(list):
@@ -42,9 +42,24 @@ class ImageSeries(list):
 
         self._start_datetime = start_datetime
         self._end_datetime = end_datetime
+        self._info_dict = {'device': self._device,
+                           'start_datetime': self._start_datetime,
+                           'end_datetime': self._end_datetime}
 
     def __repr__(self):
         return self.name
+
+    @property
+    def info_dict(self):
+        return self._info_dict
+
+    @property
+    def start_datetime(self):
+        return self._start_datetime
+
+    @property
+    def end_datetime(self):
+        return self._end_datetime
 
     @property
     def name(self):
@@ -53,14 +68,12 @@ class ImageSeries(list):
                              datetime_to_string(self._end_datetime))
 
     def populate_from_client(self, client: BaseClient):
-        image_data = client.get_images_with_uid_annotations_series([{'device': self._device,
-                                                                     'start_datetime': self._start_datetime,
-                                                                     'end_datetime': self._end_datetime}],
+        image_data = client.get_images_with_uid_annotations_series([self._info_dict],
                                                                    what_annotation='data',
                                                                    what_image='image')
         annotated_images = []
         for i in image_data:
-            if i['json']:
+            if 'json' in i and i['json']:
                 im = ImageJsonAnnotations(i['url'], json_str=i['json'])
                 annotated_images.append(im)
 
@@ -69,47 +82,8 @@ class ImageSeries(list):
             self.append(im)
 
 
-# def wrapper_make_png(x):
-#     tmp_dir,i, im, show_datetime, scale = x
-#     path_ = os.path.join(tmp_dir, "%05d.png" % i)
-#     im.to_png(path_, show_datetime=show_datetime, scale=scale)
-#
-#
-# class ImageSequence(object):
-#     def __init__(self, images):
-#         self._images = images
-#
-#     def to_animation(self, target, show_datetime=False, scale=1, n_threads=1):
-#         tmp_dir = tempfile.mkdtemp(prefix='sticky_pi_')
-#         try:
-#             jobs = []
-#             for i, im in enumerate(self._images):
-#                 jobs.append((tmp_dir, i, im, show_datetime, scale))
-#             if n_threads == 1:
-#                 for j in jobs:
-#                     wrapper_make_png(j)
-#
-#             else:
-#                 from multiprocessing.pool import Pool
-#                 with Pool(n_threads) as p:
-#                     p.map(wrapper_make_png,jobs)
-#
-#             # overwrite_output=True does not seem to work and prompt for a quiet answer?
-#             if os.path.isfile(target):
-#                 os.remove(target)
-#
-#             (
-#                 ffmpeg.input(os.path.join(tmp_dir,"%05d.png"))
-#                 # .filter('fps', fps=1, round='up')
-#                 .output(target)
-#                 .run(quiet=True, overwrite_output=True)
-#             )
-#         finally:
-#             shutil.rmtree(tmp_dir)
-
-
 class Image(object):
-    def __init__(self, path):
+    def __init__(self, path: str):
         self._path = path
         self._filename = os.path.basename(path)
         self._md5 = None
@@ -127,7 +101,7 @@ class Image(object):
     def __str__(self):
         return self.__repr__()
 
-    def _device_datetime_info(self, filename):
+    def _device_datetime_info(self, filename: str):
         fields = filename.split('.')
 
         if len(fields) != 3:
@@ -169,7 +143,7 @@ class Image(object):
         self._metadata['algo_name'] = name
         self._metadata['algo_version'] = version
 
-    def annotation_dict(self, as_json=True):
+    def annotation_dict(self, as_json: bool = True):
         try:
             metadata_to_pass = {k: self._metadata[k] for k in
                                 ['device', 'datetime', 'algo_name', 'algo_version', 'md5']}
@@ -260,7 +234,6 @@ class Image(object):
                 for k, v in img._getexif().items()
                 if k in PIL.ExifTags.TAGS
             }
-
             # cast to float for compatibility
             for k, v in out.items():
                 if isinstance(v, PIL.TiffImagePlugin.IFDRational):
@@ -502,7 +475,6 @@ class SVGImage(Image):
         utf_str = utf_str.strip('\"\'')
 
         if as_buffer:
-
             buffer = io.BytesIO()
             buffer.write(base64.b64decode(utf_str))
             buffer.seek(0)
@@ -532,6 +504,7 @@ class ArrayImage(Image):
         self._shape = self._array.shape
         return self._array
 
+
 class BufferImage(Image):
     def __init__(self, buffer, device, datetime):
         self._buffer = buffer
@@ -560,6 +533,7 @@ class BufferImage(Image):
             self._array = array
         self._shape = array.shape
         return array
+
 
 class ImageJsonAnnotations(Image):
     def __init__(self, path, json_str=None, json_path=None):
