@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+from typing import Dict
 
 class SiameseNet(nn.Module):
 
@@ -20,11 +20,11 @@ class SiameseNet(nn.Module):
             nn.Conv2d(128, 256, 4),
             nn.ReLU(),  # 256@6*6
         )
-        self.liner = nn.Sequential(nn.Linear(9216, 4096))
-        self.siam_out = nn.Sequential(nn.Linear(4096, 1), nn.Sigmoid())
+        self.liner = nn.Sequential(nn.Linear(9216, 1024))
+        self.siam_out = nn.Sequential(nn.Linear(1024, 1), nn.Sigmoid())
         self.sim_fc = nn.Sequential(nn.Linear(6, 4), nn.ReLU(),
-                                    # nn.Linear(4, 3), nn.ReLU(),
-                                    nn.Linear(4, 1), nn.Sigmoid())
+                                    nn.Linear(4, 3), nn.ReLU(),
+                                    nn.Linear(3, 1), nn.Sigmoid())
 
         self._step = ""
 
@@ -52,13 +52,10 @@ class SiameseNet(nn.Module):
     def _pretrain_fully_connected_part(self, data):
         with torch.no_grad():
             d0_1, d0_1a0, x0, x1, x1_a0 = self._image_distances(data)
-
-
         out = self._fc(data, d0_1, d0_1a0)
-
         return out
 
-    def _image_distances(self, data):
+    def _image_distances(self, data: Dict):
         try:
             x0 = data['c0']
         except KeyError:
@@ -73,12 +70,13 @@ class SiameseNet(nn.Module):
         except KeyError:
             x1_a0 = self._conv_branch(data['x1_a0'])
 
+
         d0_1a0 = self.siam_out(torch.abs(x0 - x1_a0))
         d0_1 = self.siam_out(torch.abs(x0 - x1))
+
         return d0_1, d0_1a0, x0, x1, x1_a0
 
     def _fc(self, data, d0_1, d0_1a0):
-
         ar = data['ar'].to(torch.float32).flatten().unsqueeze(1)
         d = data['log_d'].to(torch.float32).flatten().unsqueeze(1)
         area_0 = data['area_0'].to(torch.float32).flatten().unsqueeze(1)

@@ -60,7 +60,7 @@ class Predictor(BasePredictor):
     def match_two_annots(self, a0: Annotation,
                          a1: Annotation,
                          n_pairs=None,
-                         score_threshold=0.5,
+                         score_threshold=0.50,
                          cache_conv_a0=True,
                          cache_conv_a1=True,
                          cache_conv_a0_im1=True):

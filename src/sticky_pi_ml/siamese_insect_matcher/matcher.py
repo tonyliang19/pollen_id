@@ -1,40 +1,76 @@
+import os
+import pandas as pd
+import tempfile
+import shutil
 import logging
+from functools import lru_cache
 import numpy as np
 import networkx as nx
-from sticky_pi_ml.siamese_insect_matcher.predictor import Predictor
-from sticky_pi_ml.siamese_insect_matcher.ml_bundle import MLBundle
-from sticky_pi_ml.tuboid import Tuboid
-from sticky_pi_ml.image import ImageSeries, Image
-import torch
-from functools import lru_cache
 from typing import List
+
+from sticky_pi_ml.siamese_insect_matcher.predictor import Predictor
+from sticky_pi_ml.siamese_insect_matcher.ml_bundle import MLBundle, ClientMLBundle
+from sticky_pi_ml.tuboid import Tuboid, TiledTuboid
+from sticky_pi_ml.image import ImageSeries
 
 
 class Matcher(object):
     _tub_min_length = 3
 
-    def __init__(self, annotated_images_series: ImageSeries, ml_bundle: MLBundle, PredictorClass=Predictor):
+    def __init__(self, ml_bundle: MLBundle, PredictorClass=Predictor):
+        self._predictor = PredictorClass(ml_bundle)
+        self._ml_bundle = ml_bundle
+
+    def match_client(self, annotated_images_series: ImageSeries, video_dir: str = None):
+        assert issubclass(type(self._ml_bundle), ClientMLBundle), \
+            "This method only works for MLBundles linked to a client"
+        client = self._ml_bundle.client
+        logging.info('Processing series %s' % annotated_images_series)
+
+        annotated_images_series.populate_from_client(client)
+
+        if len(annotated_images_series) < 3:
+            logging.warning('Only %i annotated images in %s. Need 3 at least!' % (
+                len(annotated_images_series), annotated_images_series))
+            return
+        already_present_tuboids = pd.DataFrame(client.get_tiled_tuboid_series([annotated_images_series.info_dict]))
+
+        if 'algo_version' in already_present_tuboids.columns and \
+                len(already_present_tuboids[already_present_tuboids.algo_version == self._ml_bundle.version]) > 0:
+            logging.warning('Series %s already has matches on the client. Skipping')
+            return
+
+        # if match, we skip
+        tuboids = self.match(annotated_images_series)
+        temp_dir = tempfile.mkdtemp()
+        try:
+            to_upload = [TiledTuboid.from_tuboid(t, temp_dir).directory for t in tuboids]
+            if video_dir is not None:
+                self.make_video(tuboids, os.path.join(video_dir, annotated_images_series.name +'.mp4') )
+            client.put_tiled_tuboids(to_upload)
+            return tuboids
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def match(self, annotated_images_series: ImageSeries) -> List[Tuboid]:
         assert len(annotated_images_series) > 2
         self._annotated_images_series = annotated_images_series
-        self._predictor = PredictorClass(ml_bundle)
+        try:
+            tuboids = self._draft_graph()
+            logging.info('%i Stitching non-contiguous tuboids head to tail' % len(tuboids))
+            tuboids = self._stitch_sub_graphs(tuboids)
 
-    def __enter__(self):
-        return self
+            logging.info('%i tuboid detected. Merging conjoint tuboids' % len(tuboids))
+            tuboids = self._merge_conjoint_tuboids(tuboids)
 
-    def __call__(self) -> List[Tuboid]:
-        tuboids = self._draft_graph()
-        logging.info('%i Stitching non-contiguous tuboids head to tail' % len(tuboids))
-        tuboids = self._stitch_sub_graphs(tuboids)
+            logging.info('%i tuboid left. Removing small tuboid' % len(tuboids))
+            tuboids = [tub for tub in tuboids if len(tub) > self._tub_min_length]
 
-        logging.info('%i tuboid detected. Merging conjoint tuboids' % len(tuboids))
-        tuboids = self._merge_conjoint_tuboids(tuboids)
-
-        logging.info('%i tuboid left. Removing small tuboid' % len(tuboids))
-        tuboids = [tub for tub in tuboids if len(tub) > self._tub_min_length]
-
-        logging.info('%i tuboid left. Cleaning up' % len(tuboids))
-        # reordering tuboids
-        Tuboid.set_instances_id(tuboids)
+            logging.info('%i tuboid left. Cleaning up' % len(tuboids))
+            # reordering tuboids
+            Tuboid.set_instances_id(tuboids)
+        finally:
+            self._clean_up()
         return tuboids
 
     def _draft_graph(self) -> List[Tuboid]:
@@ -43,7 +79,7 @@ class Matcher(object):
         annotated_images.sort(key=lambda x: x.datetime)
         s0, s1 = annotated_images[0:2]
         for i, _ in enumerate(annotated_images[1:-1]):
-            logging.info('Drafting, %i/%i' % (i + 1, len(annotated_images) - 2))
+            logging.info('Drafting, %i/%i; %i edges in graph' % (i + 1, len(annotated_images) - 2, len(dg.edges)))
             s1 = annotated_images[i + 1]
             edges, nodes = self._predictor.match_two_images(s0, s1)
 
@@ -65,7 +101,7 @@ class Matcher(object):
         tuboids = []
         for sub_graph in nx.weakly_connected_components(dg):
             annotations = [nd[1]['annotation'] for nd in dg.subgraph(sub_graph).nodes(data=True)]
-            tuboids.append(Tuboid(annotations, parent_series=self._annotated_images_series))
+            tuboids.append(Tuboid(annotations, self._ml_bundle.version, parent_series=self._annotated_images_series))
         return tuboids
 
     def _stitch_sub_graphs(self, tuboids: List[Tuboid]) -> List[Tuboid]:
@@ -78,6 +114,7 @@ class Matcher(object):
                 score = self._predictor.match_two_annots(tuboids[i].tail,
                                                          tuboids[j].head)
                 arr[i, j] = score
+            # fixme. release parent image for annot i here? that would free memory?
 
         edges = []
         while np.sum(arr) > 0.0:
@@ -87,7 +124,7 @@ class Matcher(object):
             arr[:, j] = 0
 
         dg = nx.DiGraph()
-        dg.add_weighted_edges_from(edges, stitched=True)
+        dg.add_weighted_edges_from(edges)
 
         for sdg in nx.weakly_connected_components(dg):
             annots_to_merge = []
@@ -95,7 +132,8 @@ class Matcher(object):
                 annots_to_merge.extend(tuboids[tb])
                 # place holder to later delete without changing the indices yet
                 tuboids[tb] = None
-            merged_tuboid = Tuboid(annots_to_merge, parent_series=self._annotated_images_series)
+            merged_tuboid = Tuboid(annots_to_merge, self._ml_bundle.version,
+                                   parent_series=self._annotated_images_series)
 
             tuboids.append(merged_tuboid)
         tuboids = [tb for tb in tuboids if tb is not None]
@@ -130,7 +168,7 @@ class Matcher(object):
         tb1 = tuboids.pop(j)
         tb0 = tuboids.pop(i)
 
-        merged_tuboid = Tuboid(tb1 + tb0, parent_series=self._annotated_images_series)
+        merged_tuboid = Tuboid(tb1 + tb0, self._ml_bundle.version, parent_series=self._annotated_images_series)
         tuboids.append(merged_tuboid)
 
         # we recurse as still need to merge some tuboids
@@ -153,123 +191,10 @@ class Matcher(object):
                     return False
         return True
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._clean_up()
-
-    def __del__(self):
-        self._clean_up()
-
     def _clean_up(self):
         logging.info('deleting img cache!')
         for im in self._annotated_images_series:
             im.clear_cache()
-
-    #
-    # def draw_graph(self):
-    #     import plotly.graph_objs as go
-    #     pos = {}
-    #     Xn, Yn, Zn = [], [], []
-    #     labels = []
-    #     for i, attrs in list(self._dg.nodes(data=True)):
-    #         an = attrs['annotation']
-    #         z= an.datetime.timestamp()
-    #         center = an.center
-    #         x, y = center.real, center.imag
-    #         pos[i] = (x,y,z)
-    #
-    #         Xn += [x]  # x-coordinates of nodes
-    #         Yn += [y]
-    #         Zn += [z]
-    #         if'tuboid_id' in attrs:
-    #             tuboid_id = str(attrs['tuboid_id'])
-    #         else:
-    #             tuboid_id = ""
-    #         labels.append('%s | %s | %f,%f, %i'% (tuboid_id, i, x,y,z))
-    #
-    #
-    #     Xe = []
-    #     Ye = []
-    #     Ze = []
-    #     edge_labels = []
-    #     edge_width = []
-    #     edge_color = []
-    #
-    #     for i in self._dg.edges(data=True):
-    #         x0, y0, z0 = pos[i[0]]
-    #         x1, y1, z1 = pos[i[1]]
-    #         Xe += [x0, x1, None]  # x-coordinates of edge ends
-    #         Ye += [y0, y1, None]
-    #         Ze += [z0, z1, None]
-    #         edge_width.append(i[2]['weight'] * 2)
-    #         if i[2]['stitched']:
-    #             edge_color += ['#ff0000'] *3
-    #         else:
-    #             edge_color += ['#0000ff'] *3
-    #         edge_labels += ['%s -> %s | w=%f'% (i[0], i[1], i[2]['weight'])] * 3
-    #
-    #     trace1 = go.Scatter3d(x=Xe,
-    #                           y=Ye,
-    #                           z=Ze,
-    #                           mode='lines',
-    #                           line= dict(width = 5, color = edge_color),
-    #                           # color = dict(color = edge_color),
-    #                           hoverinfo='text',
-    #                           text=edge_labels
-    #                           )
-    #
-    #     trace2 = go.Scatter3d(x=Xn,
-    #                           y=Yn,
-    #                           z=Zn,
-    #                           mode='markers',
-    #                           name='insects',
-    #                           marker=dict(symbol='circle',
-    #                                       size=6,
-    #                                       colorscale='Viridis'
-    #                                       ),
-    #                           hoverinfo='text',
-    #                           text=labels
-    #                           )
-    #
-    #     axis = dict(showbackground=False,
-    #                 showline=False,
-    #                 zeroline=False,
-    #                 showgrid=False,
-    #                 showticklabels=False,
-    #                 title=''
-    #                 )
-    #
-    #     layout = go.Layout(
-    #         title="Tuboids",
-    #         width=1000,
-    #         height=1000,
-    #         showlegend=False,
-    #         scene=dict(
-    #             xaxis=dict(axis),
-    #             yaxis=dict(axis),
-    #             zaxis=dict(axis),
-    #         ),
-    #         margin=dict(
-    #             t=100
-    #         ),
-    #         hovermode='closest',
-    #         annotations=[
-    #             dict(
-    #                 showarrow=False,
-    #                 xref='paper',
-    #                 yref='paper',
-    #                 x=0,
-    #                 y=0.1,
-    #                 xanchor='left',
-    #                 yanchor='bottom',
-    #                 font=dict(
-    #                     size=14
-    #                 )
-    #             )
-    #         ], )
-    #
-    #     data=[trace1, trace2]
-    #     fig=go.Figure(data=data, layout=layout)
-    #     fig.show()
 
     def make_video(self, tuboids, out, scale=(1600, 1200), fps=4, show=False):
         import cv2

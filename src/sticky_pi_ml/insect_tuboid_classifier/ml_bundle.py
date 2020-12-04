@@ -1,11 +1,11 @@
 
 from sticky_pi_ml.ml_bundle import BaseMLBundle, BaseClientMLBundle
-from sticky_pi_ml..dataset import Dataset
+from sticky_pi_ml.insect_tuboid_classifier.dataset import Dataset
 import yaml
 
 
 class MLBundle(BaseMLBundle):
-    _name = 'siamese-insect-matcher'
+    _name = 'insect-tuboid-classifier'
     _DatasetClass = Dataset
 
     def _configure(self, config_file, device):

@@ -1,25 +1,25 @@
+import random
 import copy
-import joblib
-from joblib import Parallel, delayed
 import glob
 from math import log10
 import os
 import torch
-import cv2
-import numpy as np
-from sticky_pi_ml.dataset import BaseDataset
+from typing import List
 import logging
+import joblib
+from joblib import Parallel, delayed
+import numpy as np
+import cv2
+
 from torch.utils.data import Dataset as TorchDataset
-# DataLoader
 from torchvision.transforms import ToTensor, Compose
 from detectron2.data import transforms
+
+from sticky_pi_ml.dataset import BaseDataset
 from sticky_pi_ml.annotations import Annotation
 from sticky_pi_ml.siamese_insect_matcher.siam_svg import SiamSVG
 from sticky_pi_ml.siamese_insect_matcher.model import SiameseNet
 from sticky_pi_ml.utils import pad_to_square, detectron_to_pytorch_transform, iou, md5
-import random
-from io import BytesIO
-from typing import List
 
 to_tensor_tr = ToTensor()
 
@@ -31,10 +31,22 @@ class DataEntry(object):
     def __init__(self, a0: Annotation,
                  a1: Annotation,
                  im1: np.ndarray, n_pairs: int,
-                 data_transforms=None, dist_transform=None,
+                 data_transforms=None, dist_t_transforms=None,
                  # a hash of the net used and to cache the result of convolution,
-                 # when mathching all against all, we really don';t need to comput the full convolution for each layer!
+                 # when matching all against all, we really don';t need to comput the full convolution for each layer!
                  net_for_cache: SiameseNet = None):
+        """
+        A class to compute and store the data for the siamese insect matcher. 
+         
+        :param a0: annotation at t0
+        :param a1: annotation at t1
+        :param im1: the image at t1, as an array. This is for optimization purrposes
+        :param n_pairs: the number of annotation pairs 
+        :param data_transforms: the transforms to apply to the data for augmentation
+        :param dist_t_transforms: the transforms to apply to the distance and delta time between annotations -- for augmentation
+        :param net_for_cache: the network used to compute convolutions on the images in a0 and a1. this is used to cache
+            intermediary results
+        """
 
         if data_transforms is None:
             data_transforms = self._default_transform
@@ -65,13 +77,19 @@ class DataEntry(object):
             self._c1_0 = None
 
         dist = abs(a0.center - a1.center)
-        if dist_transform is not None:
-            dist = dist_transform(dist)
+        if dist_t_transforms is not None:
+            dist = dist_t_transforms(dist)
         dist = log10(dist + 1)
 
         self._log_dist = torch.Tensor([dist])
+        assert a1.datetime > a0.datetime, (a1.datetime,  a0.datetime)
+        delta_t = float((a1.datetime - a0.datetime).total_seconds())
 
-        self._delta_t = torch.Tensor([abs(float((a1.datetime - a0.datetime).total_seconds()) / 60.0)])
+        if dist_t_transforms is not None:
+            delta_t = dist_t_transforms(delta_t)
+        delta_t = log10(delta_t + 1)
+
+        self._delta_t = torch.Tensor([delta_t])
 
         self._n_pairs = None
 
@@ -153,7 +171,7 @@ class OurTorchDataset(TorchDataset):
         entry = copy.deepcopy(entry)
         entry['data']['im1'] = entry['data']['a1'].parent_image.read(cache=False)
 
-        out = DataEntry(**entry['data'], data_transforms=self._transforms, dist_transform=self._dist_transform)
+        out = DataEntry(**entry['data'], data_transforms=self._transforms, dist_t_transforms=self._dist_transform)
 
         return out.as_dict(), entry['label']
 
@@ -187,7 +205,7 @@ class Dataset(BaseDataset):
             if entry['md5'] > self._md5_max_training:
                 self._validation_data.append(entry)
             else:
-                        self._training_data.append(entry)
+                self._training_data.append(entry)
 
     def _serialise_imgs_to_dicts(self, input_img_list: List[str]):
 
@@ -201,7 +219,6 @@ class Dataset(BaseDataset):
 
             ssvg = SiamSVG(path)
             print('Serializing: %s. N_pairs = %i ' % (os.path.basename(path), len(ssvg.annotation_pairs)))
-
             md5_sum = md5(path)
             a0_annots = []
             a1_annots = []
@@ -210,7 +227,6 @@ class Dataset(BaseDataset):
                 a1_annots.append(a1)
 
             for i, a0 in enumerate(a0_annots):
-
                 for j, a1 in enumerate(a1_annots):
                     # im1 = a1.parent_image.read()
                     if i < j:
@@ -219,10 +235,10 @@ class Dataset(BaseDataset):
                     iou_val = iou(a0.polygon, a1.polygon)
 
                     data = {'a0': a0, 'a1': a1, 'n_pairs': len(ssvg.annotation_pairs)}
-                    if iou_val > self._max_iou:
-                        iou_max_n_discarded += 1
-                        continue
-                    elif i == j:
+                    # if iou_val > self._max_iou:
+                    #     iou_max_n_discarded += 1
+                    #     continue
+                    if i == j:
                         pos_pairs.append({'data': data, 'label': 1, 'md5': md5_sum})
                     else:
                         neg_pairs.append({'data': data, 'label': 0, 'md5': md5_sum})

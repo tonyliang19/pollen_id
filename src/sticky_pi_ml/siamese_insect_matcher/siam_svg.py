@@ -176,7 +176,7 @@ class SiamSVG(SVGImage):
 
             a0 = self._parse_one_path_to_annot(p0, self._im0, self._offset0)
             a1 = self._parse_one_path_to_annot(p1, self._im1, self._offset1)
-            self._annotation_pairs.append((a1, a0))
+            self._annotation_pairs.append((a0, a1))
 
     def _parse_one_path_to_annot(self, p, im, offset):
         style = self._style_to_dic(p)
@@ -218,9 +218,9 @@ class SiamSVG(SVGImage):
         a0, b0 = self._get_one_image(ims[0])
         a1, b1 = self._get_one_image(ims[1])
 
-
-        if ims[1].attrib['y'] < ims[1].attrib['y']:
+        if ims[1].attrib['y'] < ims[0].attrib['y']:
             a1, a0 = a0, a1
+            b1, b0 = b0, b1
 
         jpg_im_shape = a0.shape
         self._scale_in_svg = np.array(svg_im_shape) / np.array(jpg_im_shape[0:2])
@@ -232,6 +232,7 @@ class SiamSVG(SVGImage):
 
         self._im0 = BufferImage(b0, device=device, datetime=dt0)
         self._im1 = BufferImage(b1, device=device, datetime=dt1)
+
         self._device = device
         self._metadata = None
 
