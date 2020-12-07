@@ -5,7 +5,7 @@ import numpy as np
 from sticky_pi_ml.utils import pad_to_square
 from sticky_pi_ml.annotations import Annotation
 from sticky_pi_ml.image import ImageSeries
-from sticky_pi_api.utils import string_to_datetime
+from sticky_pi_api.utils import string_to_datetime, md5
 from typing import List
 
 
@@ -122,17 +122,25 @@ class Tuboid(list):
 
 class TiledTuboid(list):
     _tile_width = 224
-    _tiles_tuboid_filename = 'tuboid.jpg'
-    _context_tuboid_filename = 'context.jpg'
-    _metadata_tuboid_filename = 'metadata.txt'
+    tiles_tuboid_filename = 'tuboid.jpg'
+    context_tuboid_filename = 'context.jpg'
+    metadata_tuboid_filename = 'metadata.txt'
     _max_tuboid_duration = 24 * 3600
 
     def __init__(self, tuboid_dir):
         super().__init__()
         self._tuboid_dir = os.path.normpath(tuboid_dir)
 
-        self._device, series_start_datetime, series_end_datetime, self._matcher_version,  self._tuboid_id = \
-            os.path.basename(self._tuboid_dir).split('.')
+        fields = os.path.basename(self._tuboid_dir).split('.')
+        if len(fields) == 5:
+            self._device, series_start_datetime, series_end_datetime, self._matcher_version,  self._tuboid_id = fields
+
+        # legacy tuboids do not have a version field :(
+        elif len(fields) == 4:
+            self._device, series_start_datetime, series_end_datetime, self._tuboid_id = fields
+            self._matcher_version = None
+        else:
+            raise Exception('Irregular tuboid dir name %s' % self._tuboid_dir)
 
         self._parent_series = ImageSeries(device=self._device, start_datetime=series_start_datetime,
                                           end_datetime=series_end_datetime)
@@ -142,7 +150,7 @@ class TiledTuboid(list):
 
         self._n_tiles = 0
 
-        with open(os.path.join(self._tuboid_dir, self._metadata_tuboid_filename), 'r') as f:
+        with open(os.path.join(self._tuboid_dir, self.metadata_tuboid_filename), 'r') as f:
             while True:
                 line = f.readline().rstrip()
                 if not line:
@@ -161,6 +169,14 @@ class TiledTuboid(list):
                 self.append(o)
 
     @property
+    def md5(self):
+        return md5(os.path.join(self._tuboid_dir, self.metadata_tuboid_filename))
+
+    @property
+    def n_tiles(self):
+        return self._n_tiles
+
+    @property
     def directory(self):
         return self._tuboid_dir
 
@@ -168,11 +184,14 @@ class TiledTuboid(list):
         for i in range(self._n_tiles):
             yield self.get_tile(i)
 
+    def get_scale(self, item: int) -> float:
+        return self[item]['scale']
+
     def get_tile(self, item: int) -> np.ndarray:
         assert item < self._n_tiles
         row = item // 4
         col = item % 4
-        im = cv2.imread(os.path.join(self._tuboid_dir, self._tiles_tuboid_filename))
+        im = cv2.imread(os.path.join(self._tuboid_dir, self.tiles_tuboid_filename))
         tile = im[row * self._tile_width: row * self._tile_width + self._tile_width,
                   col * self._tile_width: col * self._tile_width + self._tile_width,
                   :]
@@ -223,14 +242,14 @@ class TiledTuboid(list):
         cv2.rectangle(arr, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), color=(255, 255, 0),
                       thickness=4)
 
-        with open(os.path.join(tuboid_dir, cls._metadata_tuboid_filename), 'w') as f:
+        with open(os.path.join(tuboid_dir, cls.metadata_tuboid_filename), 'w') as f:
             f.writelines(metadata_lines)
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 100]
-        cv2.imwrite(os.path.join(tuboid_dir, cls._tiles_tuboid_filename), out_array,
+        cv2.imwrite(os.path.join(tuboid_dir, cls.tiles_tuboid_filename), out_array,
                     params=encode_param)
 
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
-        cv2.imwrite(os.path.join(tuboid_dir, cls._context_tuboid_filename), arr,
+        cv2.imwrite(os.path.join(tuboid_dir, cls.context_tuboid_filename), arr,
                     params=encode_param)
 
         return TiledTuboid(tuboid_dir)

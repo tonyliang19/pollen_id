@@ -34,50 +34,50 @@ class TestUID(unittest.TestCase):
     _test_image = os.path.join(test_dir, "raw_images/5c173ff2/5c173ff2.2020-06-20_21-33-24.jpg")
     _raw_images_dir = os.path.join(test_dir, "raw_images")
     #
-    # def test_ml_bundle(self):
-    #     bndl = MLBundle(self._bundle_dir)
-    # #
-    # def test_client_ml_bundle(self):
-    #     client_temp_dir = tempfile.mkdtemp(prefix='sticky_pi_client_')
+    def test_ml_bundle(self):
+        bndl = MLBundle(self._bundle_dir)
     #
-    #     # the di dirname is used to identify the ML bundle
-    #     temp_dst_bundle = os.path.join(tempfile.mkdtemp(prefix='sticky_pi_test_'), 'universal-insect-detector')
-    #     os.makedirs(temp_dst_bundle)
-    #     try:
-    #         cli = LocalClient(client_temp_dir)
-    #
-    #         bndl = ClientMLBundle(self._bundle_dir, cli)
-    #         bndl.sync_local_to_remote()
-    #
-    #         # should warn the ML bundle is empty at this stage
-    #         bndl2 = ClientMLBundle(temp_dst_bundle, cli)
-    #
-    #         # should reinit the bundle after dl the data to the local dir
-    #         bndl2.sync_remote_to_local()
-    #         # bndl2 = ClientMLBundle(bndl2._root_dir, cli)
-    #
-    #         cf1 = bndl._config
-    #         cf2 = bndl2._config
-    #         cf1.MODEL.WEIGHTS = None
-    #         cf2.MODEL.WEIGHTS = None
-    #         cf1.OUTPUT_DIR = None
-    #         cf2.OUTPUT_DIR = None
-    #
-    #         self.assertDictEqual(cf1, cf2)
-    #         self.assertEqual([os.path.basename(p) for p in sorted(glob.glob(os.path.join(bndl.dataset._data_dir)))],
-    #                          [os.path.basename(p) for p in sorted(glob.glob(os.path.join(bndl2.dataset._data_dir)))])
-    #
-    #     finally:
-    #         shutil.rmtree(client_temp_dir)
-    #         shutil.rmtree(temp_dst_bundle)
-    #         pass
+    def test_client_ml_bundle(self):
+        client_temp_dir = tempfile.mkdtemp(prefix='sticky_pi_client_')
+        todel = tempfile.mkdtemp(prefix='sticky_pi_test_')
+        try:
+            temp_dst_bundle = os.path.join(todel, 'universal-insect-detector')
+            os.makedirs(temp_dst_bundle)
+            cli = LocalClient(client_temp_dir)
+
+            bndl = ClientMLBundle(self._bundle_dir, cli)
+            bndl.sync_local_to_remote()
+
+            # should warn the ML bundle is empty at this stage
+            bndl2 = ClientMLBundle(temp_dst_bundle, cli)
+
+            # should reinit the bundle after dl the data to the local dir
+            bndl2.sync_remote_to_local()
+            # bndl2 = ClientMLBundle(bndl2._root_dir, cli)
+
+            cf1 = bndl._config
+            cf2 = bndl2._config
+            cf1.MODEL.WEIGHTS = None
+            cf2.MODEL.WEIGHTS = None
+            cf1.OUTPUT_DIR = None
+            cf2.OUTPUT_DIR = None
+
+            self.assertDictEqual(cf1, cf2)
+            self.assertEqual([os.path.basename(p) for p in sorted(glob.glob(os.path.join(bndl.dataset._data_dir)))],
+                             [os.path.basename(p) for p in sorted(glob.glob(os.path.join(bndl2.dataset._data_dir)))])
+
+        finally:
+            shutil.rmtree(client_temp_dir)
+            shutil.rmtree(todel)
+            pass
     # #
     def test_client_predict(self):
         client_temp_dir = tempfile.mkdtemp(prefix='sticky_pi_client_')
         # the di dirname is used to identify the ML bundle
-        temp_dst_bundle = os.path.join(tempfile.mkdtemp(prefix='sticky_pi_test_'), 'universal-insect-detector')
-        os.makedirs(temp_dst_bundle)
+        todel = tempfile.mkdtemp(prefix='sticky_pi_test_')
         try:
+            temp_dst_bundle = os.path.join(todel, 'universal-insect-detector')
+            os.makedirs(temp_dst_bundle)
             cli = LocalClient(client_temp_dir)
 
             bndl = ClientMLBundle(self._bundle_dir, cli)
@@ -99,7 +99,7 @@ class TestUID(unittest.TestCase):
 
         finally:
             shutil.rmtree(client_temp_dir)
-            shutil.rmtree(temp_dst_bundle)
+            shutil.rmtree(todel)
             pass
 
     # def test_validate(self):

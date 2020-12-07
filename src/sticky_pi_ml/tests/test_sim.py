@@ -49,6 +49,7 @@ class TestSIM(unittest.TestCase):
 
 
     def test_trainer(self):
+        #fixme here, the bundle dir should be copied to avoid modifications?
         bndl = MLBundle(self._bundle_dir)
         t = Trainer(bndl)
         t.resume_or_load(resume=True)
@@ -68,9 +69,8 @@ class TestSIM(unittest.TestCase):
 
         client_temp_dir = tempfile.mkdtemp(prefix='sticky_pi_client_')
         temp_dst_bundle = tempfile.mkdtemp(prefix='sticky_pi_test_')
-        uid_bundle_dir = os.path.join(test_dir, 'ml_bundles/universal-insect-detector')
-
         try:
+            uid_bundle_dir = os.path.join(test_dir, 'ml_bundles/universal-insect-detector')
             cli = LocalClient(client_temp_dir)
             bndl = ClientUIDMLBundle(uid_bundle_dir, cli)
             bndl.sync_local_to_remote()

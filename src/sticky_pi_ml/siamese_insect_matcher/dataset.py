@@ -191,9 +191,6 @@ class OurTorchDataset(TorchDataset):
 
 
 class Dataset(BaseDataset):
-    # fixme this can be a config var
-    _max_iou = 0.9  # we don't use for training any pair that has iou > max_iou
-
     def __init__(self, data_dir, config, cache_dir):
         super().__init__(data_dir, config, cache_dir)
 
@@ -235,9 +232,6 @@ class Dataset(BaseDataset):
                     iou_val = iou(a0.polygon, a1.polygon)
 
                     data = {'a0': a0, 'a1': a1, 'n_pairs': len(ssvg.annotation_pairs)}
-                    # if iou_val > self._max_iou:
-                    #     iou_max_n_discarded += 1
-                    #     continue
                     if i == j:
                         pos_pairs.append({'data': data, 'label': 1, 'md5': md5_sum})
                     else:
@@ -263,18 +257,8 @@ class Dataset(BaseDataset):
         return pos_pairs + neg_pairs
 
 
-    def get_torch_data_loader(self, subset='train', shuffle=True):
-        assert subset in {'train', 'val'}, 'subset should be either "train" or "val"'
-        augment = subset == 'train'
-        to_load = self.get_torch_dataset(subset, augment=augment)
 
-        out = torch.utils.data.DataLoader(to_load,
-                                          batch_size=self._config['IMS_PER_BATCH'],
-                                          shuffle=shuffle,
-                                          num_workers=self._config['N_WORKERS'])
-        return out
-
-    def get_torch_dataset(self, subset='train', augment=False):
+    def _get_torch_dataset(self, subset='train', augment=False):
         assert subset in {'train', 'val'}, 'subset should be either "train" or "val"'
         data = self._training_data if subset == 'train' else self._validation_data
         return OurTorchDataset(data, augment=augment)
@@ -282,7 +266,7 @@ class Dataset(BaseDataset):
     def visualise(self, subset='train', augment=False, interactive=True):
         import cv2
         buff = None
-        for dt in self.get_torch_dataset(subset, augment=augment):
+        for dt in self._get_torch_dataset(subset, augment=augment):
             d, label = dt
 
             im0 = d['x0']

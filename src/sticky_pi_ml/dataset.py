@@ -25,13 +25,21 @@ class BaseDataset(object):
         assert len(self._validation_data) > 0, "Should have at least 1 images in Validation set"
         self._is_prepared = True
 
-    def get_torch_data_loader(self, subset: str, shuffle: bool) -> torch.utils.data.DataLoader:
+    def get_torch_data_loader(self, subset: str = 'train', shuffle: bool = True) -> torch.utils.data.DataLoader:
+        assert subset in {'train', 'val'}, 'subset should be either "train" or "val"'
+        augment = subset == 'train'
+        to_load = self._get_torch_dataset(subset, augment=augment)
+
+        out = torch.utils.data.DataLoader(to_load,
+                                          batch_size=self._config['IMS_PER_BATCH'],
+                                          shuffle=shuffle,
+                                          num_workers=self._config['N_WORKERS'])
+        return out
+
+    def _get_torch_dataset(self, subset: str, augment: bool) -> torch.utils.data.Dataset:
         raise NotImplementedError()
 
-    def get_torch_dataset(self, subset: str, augment: bool) -> torch.utils.data.Dataset:
-        raise NotImplementedError()
-
-    def visualise(self, subset : str='train', augment: bool=False, interactive:bool = True):
+    def visualise(self, subset: str = 'train', augment: bool = False, interactive: bool = True):
         raise NotImplementedError()
 
     @property

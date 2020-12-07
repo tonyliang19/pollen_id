@@ -180,3 +180,6 @@ class Dataset(BaseDataset):
     def mapper(self, config):
         return DatasetMapper(config)
 
+    # not used
+    def _get_torch_data_loader(self):
+        raise NotImplementedError()
