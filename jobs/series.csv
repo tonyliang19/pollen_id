@@ -1,4 +1,4 @@
-device,start_datetime,end_datetime,height,longitude,latitude 
+device,start_datetime,end_datetime,height,longitude,latitude
 f8d61a5c,2020-06-24_22-00-00,2020-07-01_12-00-00,low,,
 15e612cd,2020-06-24_22-00-00,2020-07-01_12-00-00,high,,
 0a5bb6f4,2020-06-24_22-00-00,2020-07-01_12-00-00,high,,
