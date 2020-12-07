@@ -22,6 +22,7 @@ setup(
                       'torch >= 1.4',
                       'shapely',
                       'torchvision',
+                      'sklearn',
                       'sticky_pi_api'],
     extras_require={
         'test': ['nose', 'pytest', 'pytest-cov', 'codecov', 'coverage'],
