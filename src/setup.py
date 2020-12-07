@@ -6,7 +6,8 @@ setup(
     version=__version__,
     long_description=__doc__,
     packages=find_packages(),
-    # scripts=['bin/sync_local_images.py'],
+    scripts=['bin/universal_insect_detector.py',
+             'bin/siamese_insect_matcher.py'],
     include_package_data=True,
     zip_safe=False,
     install_requires=['numpy',
@@ -21,8 +22,11 @@ setup(
                       'torch >= 1.4',
                       'shapely',
                       'torchvision',
+                      'sklearn',
                       'sticky_pi_api'],
-    tests_require=['nose'],
-    docs_require=['sphinx', 'sphinx_rtd_theme', 'recommonmark', 'mock', 'sphinx-autodoc-typehints'],
+    extras_require={
+        'test': ['nose', 'pytest', 'pytest-cov', 'codecov', 'coverage'],
+        'docs': ['mock', 'sphinx-autodoc-typehints', 'sphinx', 'sphinx_rtd_theme', 'recommonmark', 'mock']
+    },
     test_suite='nose.collector'
 )

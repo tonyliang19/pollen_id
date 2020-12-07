@@ -1,0 +1,168 @@
+import pandas as pd
+import sqlite3
+import random
+import copy
+import glob
+from math import log10
+import os
+import torch
+from typing import List, Dict, Union
+import logging
+import numpy as np
+import cv2
+
+from torch.utils.data import Dataset as TorchDataset
+from torchvision.transforms import ToTensor, Compose
+from detectron2.data import transforms
+
+from sticky_pi_ml.dataset import BaseDataset
+from sticky_pi_ml.annotations import Annotation
+from sticky_pi_ml.siamese_insect_matcher.siam_svg import SiamSVG
+from sticky_pi_ml.siamese_insect_matcher.model import SiameseNet
+from sticky_pi_ml.utils import pad_to_square, detectron_to_pytorch_transform, iou, md5
+from sticky_pi_ml.insect_tuboid_classifier.taxonomy import TaxonomyMapper
+from sticky_pi_ml.tuboid import TiledTuboid
+
+from torch.utils.data import Dataset as TorchDataset
+from torchvision.transforms import ToTensor, Compose, Normalize
+from detectron2.data import transforms
+
+
+to_tensor_tr = ToTensor()
+
+class OurTorchDataset(TorchDataset):
+    _n_shots = 6
+    def __init__(self, tuboids: List[Dict[str, Union[TiledTuboid,str,int]]], augment=True):
+        """
+        TODO fixme
+        tuboids = [(name, {images  :  [img_path_1, ..., img_path_n]),
+                           metadata: {n_images: N, taxonomy:(type, order, family, genus, species, extra)}}]
+
+        """
+        self._tuboids = tuboids
+        self._augment = augment
+        if self._augment:
+            self._transforms = Compose([
+                            detectron_to_pytorch_transform(transforms.RandomBrightness)(0.5, 1.5),
+                            detectron_to_pytorch_transform(transforms.RandomContrast)(0.5, 1.5),
+                            detectron_to_pytorch_transform(transforms.RandomSaturation)(0.5, 1.5),
+                            detectron_to_pytorch_transform(transforms.RandomFlip)(horizontal=True, vertical=False),
+                            detectron_to_pytorch_transform(transforms.RandomFlip)(horizontal=False, vertical=True),
+                            detectron_to_pytorch_transform(transforms.RandomRotation)(angle=[0, 360], sample_style='range'),
+                            detectron_to_pytorch_transform(transforms.Resize)((224,224)),
+                            to_tensor_tr,
+
+                            Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                                                ])
+        else:
+            self._transforms = Compose([to_tensor_tr,
+                                                   Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+
+    def __getitem__(self, item: int):
+        tub = self._tuboids[item]['tuboid']
+        # we pick the first shot of a tuboid and another n=self._n_shots -1
+        #fixme
+        tile_ids_drawn = np.random.choice(tub.n_tiles - 1, self._n_shots - 1) + 1
+        tile_ids_drawn = [0] + tile_ids_drawn.tolist()
+
+        scales = []
+        arrays = []
+        for t_id in tile_ids_drawn:
+            tile_dict = tub.get_tile(t_id)
+            scales.append(torch.Tensor([tile_dict['scale']]))
+            array = self._transforms(tile_dict['array'])
+            arrays.append(array)
+
+        out = {'array': torch.stack(arrays),
+               'scale': torch.stack(scales)}
+
+        return out, self._tuboids[item]['label']
+
+    def __len__(self):
+        return len(self._tuboids)
+
+
+class Dataset(BaseDataset):
+    _annotations_filename = 'database.db'
+    _annotations_table_name = 'ANNOTATIONS'
+
+    def __init__(self, data_dir, config, cache_dir):
+        """
+        the annotation file is an sqlite file with a table named `ANNOTATIONS'.
+        This table MUST have the fields:
+        * ``tuboid_id``: a uid of a tuboid formatted like ``device.start.end.software_version.id`` (f8d61a5c.2020-07-08_22-00-00.2020-07-09_12-00-00.1607090908-d74d75f50086077dbab6b1dce8c02694.0003):
+        * ``type``, ``order``, ``family`` ,``genus``,``species``. ``type`` is one of {``'Ambiguous'``,``'Background'``,``'Insecta'``}
+        Individual tuboid data are in a directory named ``device.start.end.software_version/device.start.end.software_version.id``
+        """
+        super().__init__(data_dir, config, cache_dir)
+
+        self._taxonomy_mapper = TaxonomyMapper(self._config['LABELS'])
+
+    @property
+    def n_classes(self):
+        return self._taxonomy_mapper.n_classes
+
+    def _prepare(self):
+        data = self._serialise_imgs_to_dicts()
+        while len(data) > 0:
+            entry = data.pop()
+            if entry['tuboid'].md5 > self._md5_max_training:
+                self._validation_data.append(entry)
+            else:
+                self._training_data.append(entry)
+
+    def _serialise_imgs_to_dicts(self):
+
+        conn = sqlite3.connect(os.path.join(self._data_dir, self._annotations_filename))
+        try:
+            annotations_df = pd.read_sql_query("select * from %s;" % self._annotations_table_name, conn)
+        finally:
+            conn.close()
+
+        annotations_df.sort_values("datetime", inplace=True)
+
+        # fixme should remove duplicates/ find consensus (e.g. the deepest)
+        annotations_df.drop_duplicates(['tuboid_id'], keep='last', inplace=True)
+        annotations_df.set_index('tuboid_id', inplace=True)
+
+        entries = []
+
+        for t, r in annotations_df.iterrows():
+            # t is the full tuboid id
+            t = str(t)
+
+            # full path to the parent directory of the tuboid (minus suffix)
+            series_dir = os.path.join(self._data_dir,  os.path.splitext(t)[0])
+
+            if not os.path.isdir(series_dir):
+                raise Exception("No series for tuboid %s. %s does not exist", t, series_dir)
+
+            tuboid_dir = os.path.join(series_dir, t)
+            if not os.path.isdir(tuboid_dir):
+                raise Exception("No dir for tuboid %s %s. %s does not exist", t, tuboid_dir)
+
+            tuboid = TiledTuboid(tuboid_dir)
+            entries.append({
+                'tuboid': tuboid,
+                'label': self._taxonomy_mapper.level_dict_to_label(r.to_dict())
+            })
+
+        summary = {}
+        for e in entries:
+            lab = e['label']
+            if lab not in summary:
+                summary[lab] = 0
+            summary[lab] += 1
+        logging.info('Label summary in whole dataset (N=%i): %s', len(entries),
+                     ["%s (%i) -> %i" % (self._taxonomy_mapper.label_to_pattern(k), k, summary[k])
+                      for k in sorted(summary.keys())])
+        return entries
+
+    def visualise(self, subset: str = 'train', augment: bool = False, interactive: bool = True):
+        raise NotImplementedError()
+
+
+    def _get_torch_dataset(self, subset: str = 'train', augment: bool = False) -> torch.utils.data.Dataset:
+        assert subset in {'train', 'val'}, 'subset should be either "train" or "val"'
+        data = self._training_data if subset == 'train' else self._validation_data
+        return OurTorchDataset(data, augment=augment)

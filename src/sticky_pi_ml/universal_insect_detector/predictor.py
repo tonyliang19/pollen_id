@@ -5,21 +5,82 @@ import logging
 from shapely.geometry import Polygon
 from detectron2.engine import DefaultPredictor
 from sticky_pi_ml.predictor import BasePredictor
-from sticky_pi_ml.universal_insect_detector.ml_bundle import MLBundle
+from sticky_pi_ml.universal_insect_detector.ml_bundle import MLBundle, ClientMLBundle
 from sticky_pi_ml.universal_insect_detector.palette import Palette
 from sticky_pi_ml.annotations import Annotation
+from sticky_pi_ml.image import Image
+from sticky_pi_api.client import BaseClient
+from sticky_pi_api.types import InfoType
+import pandas as pd
+from typing import Union
 
 
 class Predictor(BasePredictor):
 
-    def __init__(self, ml_bundle: MLBundle):
+    _detect_client_chunk_size = 64
 
+    def __init__(self, ml_bundle: Union[ClientMLBundle, MLBundle]):
         super().__init__(ml_bundle)
         self._min_width = self._ml_bundle.config.MIN_MAX_OBJ_SIZE[0]
         self._palette = Palette({k: v for k, v in self._ml_bundle.config.CLASSES})
         self._detectron_predictor = DefaultPredictor(self._ml_bundle.config)
 
-    def detect(self, image, *args, **kwargs):
+    def detect_client(self, info: InfoType = None, *args, **kwargs):
+        assert issubclass(type(self._ml_bundle), ClientMLBundle), \
+            "This method only works for MLBundles linked to a client"
+
+        client = self._ml_bundle.client
+
+        if info is None:
+            info = [{'device': '%',
+                     'start_datetime': "1970-01-01_00-00-00",
+                     'end_datetime': "2070-01-01_00-00-00"}]
+            logging.info('No info provided. Fetching all annotations')
+        while True:
+            client_resp = client.get_images_with_uid_annotations_series(info, what_image='metadata', what_annotation='metadata')
+
+            if len(client_resp) == 0:
+                return
+
+            df = pd.DataFrame(client_resp)
+
+
+            if 'algo_name' not in df.columns:
+                logging.info('No annotations for the requested images. Fetching all!')
+                conditions = df.id > -1 # just fill with True
+                df['algo_version'] = None
+                df['algo_name'] = ""
+
+            df = df.sort_values(by=['algo_version', 'datetime'])
+            df = df.drop_duplicates(subset=['id'], keep='last')
+            # here, we filter/sort df to keep only images that are not annotated by this version.
+            # we sort by version tag
+
+            conditions = (self.version > df.algo_version) | \
+                         (df.algo_version.isnull()) | \
+                         (self.name != df.algo_name)
+
+            df = df[conditions]
+            if len(df) == 0:
+                logging.info('All annotations uploaded!')
+                return
+
+            query = [df.iloc[i].to_dict() for i in range(min(len(df), self._detect_client_chunk_size))]
+            image_data = client.get_images(info=query, what='image')
+            urls = [im['url'] for im in image_data]
+
+            all_annots = []
+            for u in urls:
+                im = Image(u)
+                annotated_im = self.detect(im, *args, **kwargs)
+                logging.info('Detecting in image %s' % im)
+                annots = annotated_im.annotation_dict(as_json=False)
+                all_annots.append(annots)
+                logging.info("Staging annotations: %s" % annotated_im)
+            logging.info("Sending %i annotations to client" % len(all_annots))
+            client.put_uid_annotations(all_annots)
+
+    def detect(self, image, *args, **kwargs) -> Image:
         instances = self._detect_instances(image, *args, **kwargs)
         new_image = image.copy()
         new_image.set_annotations(instances)
