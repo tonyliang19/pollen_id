@@ -1,5 +1,5 @@
 import unittest
-from sticky_pi_ml.image import Image, SVGImage, ImageJsonAnnotations
+from sticky_pi_ml.image import Image, SVGImage, ImageJsonAnnotations, ImageSeries
 import os
 import logging
 import pytz
@@ -10,28 +10,12 @@ from sticky_pi_ml.annotations import Annotation
 import glob
 import shutil
 
-#
-# class TestImageSequence(unittest.TestCase):
-#     _test_seq = [i for i in sorted(glob.glob('sticky_pi_dir/raw_images/7168f343/*.jpg'))]
-#
-#     def test_to_video(self):
-#         images = [Image(i) for i in self._test_seq]
-#         seq = ImageSequence(images)
-#
-#         target = tempfile.mktemp(prefix='sticky_pi_video_', suffix='.mp4')
-#         try:
-#             seq.to_animation(target, scale=.25)
-#             self.assertTrue(os.path.exists(target))
-#
-#         finally:
-#             import logging
-#             # logging.warning(target)
-#             os.remove(target)
-
 test_dir = os.path.dirname(__file__)
 
 class TestImage(unittest.TestCase):
     # _test_image = "raw_images/1b74105a/1b74105a"
+    _raw_images_dir = os.path.join(test_dir, "raw_images")
+    _bundle_dir = os.path.join(test_dir, 'ml_bundles/universal-insect-detector')
     _test_image = os.path.join(test_dir, "raw_images/1b74105a/1b74105a.2020-07-05_10-07-16.jpg")
     # _test_svg_images = ("sticky_pi_dir/raw_images/01abcabc.2020-01-01_01-02-03.svg",
     #                     "sticky_pi_dir/raw_images//d59ff54a.2020-03-03_18-04-20.svg",
@@ -53,6 +37,48 @@ class TestImage(unittest.TestCase):
         self.assertEqual(im.filename, '1b74105a.2020-07-05_10-07-16.jpg')
         self.assertEqual(im.path, full_path)
 
+    def test_image_series(self):
+        from sticky_pi_ml.universal_insect_detector.ml_bundle import ClientMLBundle
+        from sticky_pi_api.client import LocalClient
+        from sticky_pi_ml.tests.test_uid import MockPredictor
+
+        client_temp_dir = tempfile.mkdtemp(prefix='sticky_pi_client_')
+        # the di dirname is used to identify the ML bundle
+        todel = tempfile.mkdtemp(prefix='sticky_pi_test_')
+        try:
+            temp_dst_bundle = os.path.join(todel, 'universal-insect-detector')
+            os.makedirs(temp_dst_bundle)
+            cli = LocalClient(client_temp_dir)
+
+            bndl = ClientMLBundle(self._bundle_dir, cli)
+            bndl.sync_local_to_remote()
+            ims_to_pred = [im for im in sorted(glob.glob(os.path.join(self._raw_images_dir, '**', '*.jpg')))]
+            cli.put_images(ims_to_pred)
+
+            pred = MockPredictor(bndl)
+
+            series = ImageSeries(device='0a5bb6f4',
+                                 start_datetime='2020-01-01_00-00-00',
+                                 end_datetime='2021-01-01_00-00-00')
+
+            series.populate_from_client(cli)
+            self.assertEqual(len(series), 0)
+            pred.detect_client()
+            series.populate_from_client(cli)
+            self.assertEqual(len(series), 5)
+            # should populate only with the last version of the algorithm available
+            pred._version = '1604062778-262624ad1767b977801645a8addefbe6'
+            pred.detect_client()
+            series.populate_from_client(cli)
+            self.assertEqual(len(series), 5)
+            for s in series:
+                self.assertEqual(s.algo_version == pred._version)
+
+        finally:
+            shutil.rmtree(client_temp_dir)
+            shutil.rmtree(todel)
+            pass
+
     def test_read(self):
         full_path = os.path.join(os.path.dirname(__file__), self._test_image)
         im = Image(full_path)
@@ -62,7 +88,7 @@ class TestImage(unittest.TestCase):
     def test_to_svg(self):
         self._to_svg(self._test_image)
 
-    #
+
     # def test_json_image(self):
     #     im = self._test_svg_images[2]
     #     svg_ori = SVGImage(im)
@@ -71,8 +97,8 @@ class TestImage(unittest.TestCase):
     #     json_annots = svg_ori.json_annotations()
     #
     #     # ImageJsonAnnotations(json_annots)
-    #
-    #
+
+
     # def test_svg_to_svg(self):
     #     im = self._test_svg_images[2]
     #     svg_ori = SVGImage(im)

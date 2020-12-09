@@ -1,8 +1,6 @@
 """
 
 """
-
-
 import io
 import json
 import os
@@ -21,6 +19,7 @@ import shutil
 from cairosvg import svg2png
 import svgpathtools
 from typing import Union
+import pandas as pd
 
 from sticky_pi_api.utils import datetime_to_string, string_to_datetime
 from sticky_pi_api.client import BaseClient
@@ -68,13 +67,23 @@ class ImageSeries(list):
                              datetime_to_string(self._end_datetime))
 
     def populate_from_client(self, client: BaseClient):
-        image_data = client.get_images_with_uid_annotations_series([self._info_dict],
+        client_resp = client.get_images_with_uid_annotations_series([self._info_dict],
                                                                    what_annotation='data',
                                                                    what_image='image')
+        df = pd.DataFrame(client_resp)
+        if 'algo_name' not in df.columns:
+            logging.info('No annotations for the requested images. Fetching all!')
+            conditions = df.id > -1  # just fill with True
+            df['algo_version'] = None
+            df['algo_name'] = ""
+
+        df = df.sort_values(by=['algo_version', 'datetime'])
+        df = df.drop_duplicates(subset=['id'], keep='last')
+
         annotated_images = []
-        for i in image_data:
-            if 'json' in i and i['json']:
-                im = ImageJsonAnnotations(i['url'], json_str=i['json'])
+        for _, r in df.iterrows():
+            if 'json' in r and r['json']:
+                im = ImageJsonAnnotations(r['url'], json_str=r['json'])
                 annotated_images.append(im)
 
         self.clear()

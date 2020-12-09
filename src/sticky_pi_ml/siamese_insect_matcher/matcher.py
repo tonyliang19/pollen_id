@@ -37,7 +37,7 @@ class Matcher(object):
 
         if 'algo_version' in already_present_tuboids.columns and \
                 len(already_present_tuboids[already_present_tuboids.algo_version == self._ml_bundle.version]) > 0:
-            logging.warning('Series %s already has matches on the client. Skipping')
+            logging.warning('Series %s already has matches on the client. Skipping.' % annotated_images_series)
             return
 
         # if match, we skip

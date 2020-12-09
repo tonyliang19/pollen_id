@@ -1,6 +1,7 @@
+import itertools
 from collections import OrderedDict
 import re
-from  typing import Tuple, Dict, List, Union
+from typing import Tuple, Dict, List, Union
 
 
 class TaxonomyMapper(object):
@@ -42,7 +43,7 @@ class TaxonomyMapper(object):
         tupl = (dic[rank] for rank in self._taxonomic_levels)
         return self.tuple_to_label(tupl)
 
-    def tuple_to_label(self, tupl: Tuple) -> int :
+    def tuple_to_label(self, tupl: Tuple) -> int:
         string = ".".join(tupl)
         for k, v in self._pattern_to_label_map.items():
             if re.match(k, string):
@@ -51,3 +52,10 @@ class TaxonomyMapper(object):
 
     def label_to_pattern(self, label: int) -> str:
         return self._label_to_pattern_map[label]
+
+    def label_to_level_dict(self, label: int) -> Dict[str, str]:
+        pattern = self.label_to_pattern(label)
+        fields = [re.sub('[^a-zA-Z]', '', f) for f in pattern.split(r'\.')]
+        assert 0 < len(fields) <= len(self._taxonomic_levels)
+        out = {tax: f for tax, f in itertools.zip_longest(self._taxonomic_levels, fields)}
+        return out
