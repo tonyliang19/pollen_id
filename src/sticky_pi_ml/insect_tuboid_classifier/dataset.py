@@ -1,38 +1,29 @@
-import pandas as pd
 import sqlite3
-import random
-import copy
-import glob
-from math import log10
 import os
 import torch
 from typing import List, Dict, Union
 import logging
 import numpy as np
-import cv2
-
+import pandas as pd
 from torch.utils.data import Dataset as TorchDataset
-from torchvision.transforms import ToTensor, Compose
-from detectron2.data import transforms
-
-from sticky_pi_ml.dataset import BaseDataset
-from sticky_pi_ml.annotations import Annotation
-from sticky_pi_ml.siamese_insect_matcher.siam_svg import SiamSVG
-from sticky_pi_ml.siamese_insect_matcher.model import SiameseNet
-from sticky_pi_ml.utils import pad_to_square, detectron_to_pytorch_transform, iou, md5
-from sticky_pi_ml.insect_tuboid_classifier.taxonomy import TaxonomyMapper
-from sticky_pi_ml.tuboid import TiledTuboid
-
-from torch.utils.data import Dataset as TorchDataset
+from torch import Tensor
 from torchvision.transforms import ToTensor, Compose, Normalize
 from detectron2.data import transforms
 
+from sticky_pi_ml.dataset import BaseDataset
+from sticky_pi_ml.utils import detectron_to_pytorch_transform
+from sticky_pi_ml.insect_tuboid_classifier.taxonomy import TaxonomyMapper
+from sticky_pi_ml.tuboid import TiledTuboid
 
 to_tensor_tr = ToTensor()
+normalize_tr = Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+
 
 class OurTorchDataset(TorchDataset):
-    _n_shots = 6
-    def __init__(self, tuboids: List[Dict[str, Union[TiledTuboid,str,int]]], augment=True):
+    _n_shots_drawn = 6
+    default_transform = Compose([to_tensor_tr, normalize_tr])
+
+    def __init__(self, tuboids: List[Dict[str, Union[TiledTuboid, str, int]]], augment=True):
         """
         TODO fixme
         tuboids = [(name, {images  :  [img_path_1, ..., img_path_n]),
@@ -43,43 +34,52 @@ class OurTorchDataset(TorchDataset):
         self._augment = augment
         if self._augment:
             self._transforms = Compose([
-                            detectron_to_pytorch_transform(transforms.RandomBrightness)(0.5, 1.5),
-                            detectron_to_pytorch_transform(transforms.RandomContrast)(0.5, 1.5),
-                            detectron_to_pytorch_transform(transforms.RandomSaturation)(0.5, 1.5),
-                            detectron_to_pytorch_transform(transforms.RandomFlip)(horizontal=True, vertical=False),
-                            detectron_to_pytorch_transform(transforms.RandomFlip)(horizontal=False, vertical=True),
-                            detectron_to_pytorch_transform(transforms.RandomRotation)(angle=[0, 360], sample_style='range'),
-                            detectron_to_pytorch_transform(transforms.Resize)((224,224)),
-                            to_tensor_tr,
+                detectron_to_pytorch_transform(transforms.RandomBrightness)(0.5, 1.5),
+                detectron_to_pytorch_transform(transforms.RandomContrast)(0.5, 1.5),
+                detectron_to_pytorch_transform(transforms.RandomSaturation)(0.5, 1.5),
+                detectron_to_pytorch_transform(transforms.RandomFlip)(horizontal=True, vertical=False),
+                detectron_to_pytorch_transform(transforms.RandomFlip)(horizontal=False, vertical=True),
+                detectron_to_pytorch_transform(transforms.RandomRotation)(angle=[0, 360], sample_style='range'),
+                detectron_to_pytorch_transform(transforms.Resize)((224, 224)),
+                to_tensor_tr,
+                normalize_tr
 
-                            Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-                                                ])
+            ])
         else:
-            self._transforms = Compose([to_tensor_tr,
-                                                   Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+            self._transforms = self.default_transform
 
     def __getitem__(self, item: int):
         tub = self._tuboids[item]['tuboid']
         # we pick the first shot of a tuboid and another n=self._n_shots -1
-        #fixme
-        tile_ids_drawn = np.random.choice(tub.n_tiles - 1, self._n_shots - 1) + 1
+        out = OurTorchDataset.tiled_tuboid_to_dict(tub, self._transforms)
+        return out, self._tuboids[item]['label']
+
+    def __len__(self):
+        return len(self._tuboids)
+
+    @classmethod
+    def tiled_tuboid_to_dict(cls, tuboid: TiledTuboid, im_transforms: Compose = None,
+                             unsqueezed: bool = False) -> Dict[str, Tensor]:
+        if im_transforms is None:
+            im_transforms = cls.default_transform
+
+        tile_ids_drawn = np.random.choice(tuboid.n_tiles - 1, cls._n_shots_drawn - 1) + 1
         tile_ids_drawn = [0] + tile_ids_drawn.tolist()
 
         scales = []
         arrays = []
         for t_id in tile_ids_drawn:
-            tile_dict = tub.get_tile(t_id)
+            tile_dict = tuboid.get_tile(t_id)
             scales.append(torch.Tensor([tile_dict['scale']]))
-            array = self._transforms(tile_dict['array'])
+            array = im_transforms(tile_dict['array'])
             arrays.append(array)
 
         out = {'array': torch.stack(arrays),
                'scale': torch.stack(scales)}
+        if unsqueezed:
+            out = {k: v.unsqueeze(0) for k, v in out.items()}
 
-        return out, self._tuboids[item]['label']
-
-    def __len__(self):
-        return len(self._tuboids)
+        return out
 
 
 class Dataset(BaseDataset):
@@ -101,6 +101,10 @@ class Dataset(BaseDataset):
     @property
     def n_classes(self):
         return self._taxonomy_mapper.n_classes
+
+    @property
+    def taxonomy_mapper(self):
+        return self._taxonomy_mapper
 
     def _prepare(self):
         data = self._serialise_imgs_to_dicts()
@@ -132,7 +136,7 @@ class Dataset(BaseDataset):
             t = str(t)
 
             # full path to the parent directory of the tuboid (minus suffix)
-            series_dir = os.path.join(self._data_dir,  os.path.splitext(t)[0])
+            series_dir = os.path.join(self._data_dir, os.path.splitext(t)[0])
 
             if not os.path.isdir(series_dir):
                 raise Exception("No series for tuboid %s. %s does not exist", t, series_dir)
@@ -160,7 +164,6 @@ class Dataset(BaseDataset):
 
     def visualise(self, subset: str = 'train', augment: bool = False, interactive: bool = True):
         raise NotImplementedError()
-
 
     def _get_torch_dataset(self, subset: str = 'train', augment: bool = False) -> torch.utils.data.Dataset:
         assert subset in {'train', 'val'}, 'subset should be either "train" or "val"'

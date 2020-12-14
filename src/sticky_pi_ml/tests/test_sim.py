@@ -63,23 +63,24 @@ class TestSIM(unittest.TestCase):
     #     # pred.match_two_annots()
     #     o = pred.match_two_images(*self._test_reg_images[1:3])
 
-    def test_make_candidate(self):
-        from sticky_pi_ml.tests.test_uid import MockPredictor as MockUIDPredictor
-        from sticky_pi_ml.universal_insect_detector.ml_bundle import ClientMLBundle as ClientUIDMLBundle
-
-        client_temp_dir = tempfile.mkdtemp(prefix='sticky_pi_client_')
-        temp_dst_bundle = tempfile.mkdtemp(prefix='sticky_pi_test_')
-        try:
-            uid_bundle_dir = os.path.join(test_dir, 'ml_bundles/universal-insect-detector')
-            cli = LocalClient(client_temp_dir)
-            bndl = ClientUIDMLBundle(uid_bundle_dir, cli)
-            bndl.sync_local_to_remote()
-            ims_to_pred = [im for im in sorted(glob.glob(os.path.join(self._raw_images_dir, '**', '*.jpg')))]
-            cli.put_images(ims_to_pred)
-            pred = MockUIDPredictor(bndl)
-            pred.detect_client()
-            make_candidates(cli, out_dir=temp_dst_bundle)
-
-        finally:
-            shutil.rmtree(client_temp_dir)
-            shutil.rmtree(temp_dst_bundle)
+    # def test_make_candidate(self):
+    #     from sticky_pi_ml.tests.test_uid import MockPredictor as MockUIDPredictor
+    #     from sticky_pi_ml.universal_insect_detector.ml_bundle import ClientMLBundle as ClientUIDMLBundle
+    #
+    #     client_temp_dir = tempfile.mkdtemp(prefix='sticky_pi_client_')
+    #     temp_dst_bundle = tempfile.mkdtemp(prefix='sticky_pi_test_')
+    #     try:
+    #         uid_bundle_dir = os.path.join(test_dir, 'ml_bundles/universal-insect-detector')
+    #         cli = LocalClient(client_temp_dir)
+    #         bndl = ClientUIDMLBundle(uid_bundle_dir, cli)
+    #         bndl.sync_local_to_remote()
+    #         ims_to_pred = [im for im in sorted(glob.glob(os.path.join(self._raw_images_dir, '**', '*.jpg')))]
+    #         cli.put_images(ims_to_pred)
+    #         pred = MockUIDPredictor(bndl)
+    #         pred.detect_client()
+    #         make_candidates(cli, out_dir=temp_dst_bundle)
+    #
+    #     finally:
+    #         shutil.rmtree(client_temp_dir)
+    #         shutil.rmtree(temp_dst_bundle)
+    # #
