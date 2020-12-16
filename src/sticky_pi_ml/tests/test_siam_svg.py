@@ -2,15 +2,13 @@ import unittest
 from sticky_pi_ml.siamese_insect_matcher.siam_svg import SiamSVG, SVGImage
 import os
 import logging
-import pytz
-import datetime
-import numpy as np
 import tempfile
-from sticky_pi_ml.annotations import Annotation
 import glob
 import shutil
 
-logging.getLogger().setLevel(logging.INFO)
+logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
+
 test_dir = os.path.dirname(__file__)
 
 

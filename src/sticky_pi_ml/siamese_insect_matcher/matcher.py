@@ -46,8 +46,9 @@ class Matcher(object):
         try:
             to_upload = [TiledTuboid.from_tuboid(t, temp_dir).directory for t in tuboids]
             if video_dir is not None:
-                self.make_video(tuboids, os.path.join(video_dir, annotated_images_series.name +'.mp4') )
+                self.make_video(tuboids, os.path.join(video_dir, annotated_images_series.name +'.mp4'))
             client.put_tiled_tuboids(to_upload)
+            logging.info('Done with series %s' % annotated_images_series)
             return tuboids
         finally:
             shutil.rmtree(temp_dir)

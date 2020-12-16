@@ -68,12 +68,15 @@ class ImageSeries(list):
 
     def populate_from_client(self, client: BaseClient):
         client_resp = client.get_images_with_uid_annotations_series([self._info_dict],
-                                                                   what_annotation='data',
-                                                                   what_image='image')
+                                                                    what_annotation='data',
+                                                                    what_image='image')
         df = pd.DataFrame(client_resp)
+        if len(df) == 0:
+            logging.warning('No image for %s' % self._info_dict)
+            return
+
         if 'algo_name' not in df.columns:
             logging.info('No annotations for the requested images. Fetching all!')
-            conditions = df.id > -1  # just fill with True
             df['algo_version'] = None
             df['algo_name'] = ""
 
