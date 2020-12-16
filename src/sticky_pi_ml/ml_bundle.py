@@ -68,11 +68,10 @@ class BaseMLBundle(ABC):
         if not os.path.isfile(config_file):
             logging.warning("Configuration file %s is does not exist (yet?)" % config_file)
             self._config = None
-
+            self._dataset = None
         else:
             self._config = self._configure(config_file, self._device)
-
-        self._dataset = self._DatasetClass(self._data_dir, self._config, self._cache_dir)
+            self._dataset = self._DatasetClass(self._data_dir, self._config, self._cache_dir)
 
     def _configure(self, config_file, device):
         raise NotImplementedError
