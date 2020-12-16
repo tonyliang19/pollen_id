@@ -96,7 +96,7 @@ class Dataset(BaseDataset):
         """
         super().__init__(data_dir, config, cache_dir)
 
-        self._taxonomy_mapper = TaxonomyMapper(self._config['LABELS'])
+        self._taxonomy_mapper = None
 
     @property
     def n_classes(self):
@@ -107,6 +107,7 @@ class Dataset(BaseDataset):
         return self._taxonomy_mapper
 
     def _prepare(self):
+        self._taxonomy_mapper = TaxonomyMapper(self._config['LABELS'])
         data = self._serialise_imgs_to_dicts()
         while len(data) > 0:
             entry = data.pop()
