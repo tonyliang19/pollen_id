@@ -92,7 +92,7 @@ class Predictor(BasePredictor):
             all_predictions.append(prediction)
             if len(all_predictions) >= self._client_predict_chunk_size:
                 logging.info('Sending batch of predictions through client')
-                client.put_itc_labels(all_predictions, what='data')
+                client.put_itc_labels(all_predictions)
                 all_predictions.clear()
 
         if len(all_predictions) > 0:
