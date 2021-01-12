@@ -55,7 +55,7 @@ class TaxonomyMapper(object):
 
     def label_to_level_dict(self, label: int) -> Dict[str, str]:
         pattern = self.label_to_pattern(label)
-        fields = [re.sub('[^a-zA-Z]', '', f) for f in pattern.split(r'\.')]
+        fields = [re.sub('[^a-zA-Z ]', '', f) for f in pattern.split(r'\.')]
         assert 0 < len(fields) <= len(self._taxonomic_levels)
         out = {tax: f for tax, f in itertools.zip_longest(self._taxonomic_levels, fields)}
         return out

@@ -96,7 +96,8 @@ def detectron_to_pytorch_transform(Class):
 
 class MLScriptParser(argparse.ArgumentParser):
     _valid_actions = {'fetch', 'train', 'qc', 'validate', 'push', 'predict', 'candidates'}
-    _required_env_vars = ['BUNDLE_ROOT_DIR', 'LOCAL_CLIENT_DIR']
+    _required_env_vars = ['BUNDLE_ROOT_DIR', 'LOCAL_CLIENT_DIR',
+                          'API_HOST', 'API_USER', 'API_PASSWORD']
 
     def __init__(self, config_file=None):
         super().__init__()
@@ -113,6 +114,7 @@ class MLScriptParser(argparse.ArgumentParser):
 
         self.add_argument("-r", "--restart-training", dest="restart_training", default=False, action="store_true")
         self.add_argument("-g", "--gpu", dest="gpu", default=False, help="GPU", action="store_true")
+        self.add_argument("-l", "--local-api", dest="local_api", default=False, help="Whether to use the local api", action="store_true")
         self._config_file = config_file
 
     def _get_env_conf(self):

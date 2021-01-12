@@ -47,12 +47,12 @@ class Predictor(BasePredictor):
 
             if 'algo_name' not in df.columns:
                 logging.info('No annotations for the requested images. Fetching all!')
-                conditions = df.id > -1 # just fill with True
                 df['algo_version'] = None
                 df['algo_name'] = ""
 
             df = df.sort_values(by=['algo_version', 'datetime'])
             df = df.drop_duplicates(subset=['id'], keep='last')
+
             # here, we filter/sort df to keep only images that are not annotated by this version.
             # we sort by version tag
 
@@ -65,18 +65,36 @@ class Predictor(BasePredictor):
                 logging.info('All annotations uploaded!')
                 return
 
-            query = [df.iloc[i].to_dict() for i in range(min(len(df), self._detect_client_chunk_size))]
+            query = [df.iloc[i][['device', 'datetime']].to_dict() for i in range(min(len(df), self._detect_client_chunk_size))]
             image_data = client.get_images(info=query, what='image')
             urls = [im['url'] for im in image_data]
 
             all_annots = []
             for u in urls:
-                im = Image(u)
-                annotated_im = self.detect(im, *args, **kwargs)
-                logging.info('Detecting in image %s' % im)
-                annots = annotated_im.annotation_dict(as_json=False)
-                all_annots.append(annots)
-                logging.info("Staging annotations: %s" % annotated_im)
+                import requests
+                import os
+                import tempfile
+                import shutil
+                temp_dir = None
+                try:
+                    if not os.path.isfile(u):
+                        temp_dir = tempfile.mkdtemp()
+                        filename = os.path.basename(u).split('?')[0]
+                        resp = requests.get(u).content
+                        with open(os.path.join(temp_dir, filename), 'wb') as file:
+                            file.write(resp)
+                        u = os.path.join(temp_dir, filename)
+                    print(u)
+                    im = Image(u)
+                    annotated_im = self.detect(im, *args, **kwargs)
+                    logging.info('Detecting in image %s' % im)
+                    annots = annotated_im.annotation_dict(as_json=False)
+                    all_annots.append(annots)
+                    logging.info("Staging annotations: %s" % annotated_im)
+                finally:
+                    if temp_dir:
+                        shutil.rmtree(temp_dir)
+
             logging.info("Sending %i annotations to client" % len(all_annots))
             client.put_uid_annotations(all_annots)
 

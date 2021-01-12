@@ -230,7 +230,7 @@ class Image(object):
     def _get_array(self):
         out = cv2.imread(self._path)
         if out is None:
-            raise Exception('Could not read image file %s' % s)
+            raise Exception('Could not read image file %s' % self._path)
         return out
 
     @property
