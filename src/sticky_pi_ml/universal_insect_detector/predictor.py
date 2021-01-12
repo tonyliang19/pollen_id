@@ -71,12 +71,30 @@ class Predictor(BasePredictor):
 
             all_annots = []
             for u in urls:
-                im = Image(u)
-                annotated_im = self.detect(im, *args, **kwargs)
-                logging.info('Detecting in image %s' % im)
-                annots = annotated_im.annotation_dict(as_json=False)
-                all_annots.append(annots)
-                logging.info("Staging annotations: %s" % annotated_im)
+                import requests
+                import os
+                import tempfile
+                import shutil
+                temp_dir = None
+                try:
+                    if not os.path.isfile(u):
+                        temp_dir = tempfile.mkdtemp()
+                        filename = os.path.basename(u).split('?')[0]
+                        resp = requests.get(u).content
+                        with open(os.path.join(temp_dir, filename), 'wb') as file:
+                            file.write(resp)
+                        u = os.path.join(temp_dir, filename)
+                    print(u)
+                    im = Image(u)
+                    annotated_im = self.detect(im, *args, **kwargs)
+                    logging.info('Detecting in image %s' % im)
+                    annots = annotated_im.annotation_dict(as_json=False)
+                    all_annots.append(annots)
+                    logging.info("Staging annotations: %s" % annotated_im)
+                finally:
+                    if temp_dir:
+                        shutil.rmtree(temp_dir)
+
             logging.info("Sending %i annotations to client" % len(all_annots))
             client.put_uid_annotations(all_annots)
 
