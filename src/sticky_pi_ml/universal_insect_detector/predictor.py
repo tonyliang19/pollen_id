@@ -47,12 +47,12 @@ class Predictor(BasePredictor):
 
             if 'algo_name' not in df.columns:
                 logging.info('No annotations for the requested images. Fetching all!')
-                conditions = df.id > -1 # just fill with True
                 df['algo_version'] = None
                 df['algo_name'] = ""
 
             df = df.sort_values(by=['algo_version', 'datetime'])
             df = df.drop_duplicates(subset=['id'], keep='last')
+
             # here, we filter/sort df to keep only images that are not annotated by this version.
             # we sort by version tag
 
@@ -65,7 +65,7 @@ class Predictor(BasePredictor):
                 logging.info('All annotations uploaded!')
                 return
 
-            query = [df.iloc[i].to_dict() for i in range(min(len(df), self._detect_client_chunk_size))]
+            query = [df.iloc[i][['device', 'datetime']].to_dict() for i in range(min(len(df), self._detect_client_chunk_size))]
             image_data = client.get_images(info=query, what='image')
             urls = [im['url'] for im in image_data]
 
