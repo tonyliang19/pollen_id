@@ -20,6 +20,7 @@ def make_client(opt_dict):
                            opt_dict['API_PASSWORD'])
     return out
 
+
 if __name__ == '__main__':
     parser = MLScriptParser()
     option_dict = parser.get_opt_dict()
@@ -27,9 +28,7 @@ if __name__ == '__main__':
     ml_bundle_cache = os.path.join(bundle_dir,'.cache')
     os.makedirs(ml_bundle_cache, exist_ok=True)
 
-
     if option_dict['action'] == 'fetch':
-        #todo use remote client here
         client = make_client(option_dict)
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'])
         ml_bundle.sync_remote_to_local()

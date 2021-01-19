@@ -22,6 +22,10 @@ class Matcher(object):
         self._ml_bundle = ml_bundle
 
     def match_client(self, annotated_images_series: ImageSeries, video_dir: str = None):
+        series_info = annotated_images_series.info_dict
+        series_info.update({'algo_name': self._ml_bundle.name,
+                            'algo_version': self._ml_bundle.version})
+
         assert issubclass(type(self._ml_bundle), ClientMLBundle), \
             "This method only works for MLBundles linked to a client"
         client = self._ml_bundle.client
@@ -46,8 +50,13 @@ class Matcher(object):
         try:
             to_upload = [TiledTuboid.from_tuboid(t, temp_dir).directory for t in tuboids]
             if video_dir is not None:
-                self.make_video(tuboids, os.path.join(video_dir, annotated_images_series.name +'.mp4'))
-            client.put_tiled_tuboids(to_upload)
+                self.make_video(tuboids, os.path.join(video_dir, annotated_images_series.name + '.mp4'),
+                                annotated_images_series=annotated_images_series)
+
+            series_info['n_images'] = len(annotated_images_series)
+            series_info['n_tuboids'] = len(to_upload)
+
+            client.put_tiled_tuboids(to_upload, series_info=series_info)
             logging.info('Done with series %s' % annotated_images_series)
             return tuboids
         finally:
@@ -55,14 +64,13 @@ class Matcher(object):
 
     def match(self, annotated_images_series: ImageSeries) -> List[Tuboid]:
         assert len(annotated_images_series) > 2
-        self._annotated_images_series = annotated_images_series
         try:
-            tuboids = self._draft_graph()
+            tuboids = self._draft_graph(annotated_images_series)
             logging.info('%i Stitching non-contiguous tuboids head to tail' % len(tuboids))
-            tuboids = self._stitch_sub_graphs(tuboids)
+            tuboids = self._stitch_sub_graphs(tuboids, annotated_images_series)
 
             logging.info('%i tuboid detected. Merging conjoint tuboids' % len(tuboids))
-            tuboids = self._merge_conjoint_tuboids(tuboids)
+            tuboids = self._merge_conjoint_tuboids(tuboids, annotated_images_series)
 
             logging.info('%i tuboid left. Removing small tuboid' % len(tuboids))
             tuboids = [tub for tub in tuboids if len(tub) > self._tub_min_length]
@@ -71,12 +79,11 @@ class Matcher(object):
             # reordering tuboids
             Tuboid.set_instances_id(tuboids)
         finally:
-            self._clean_up()
+            self._clean_up(annotated_images_series)
         return tuboids
 
-    def _draft_graph(self) -> List[Tuboid]:
+    def _draft_graph(self, annotated_images: ImageSeries) -> List[Tuboid]:
         dg = nx.DiGraph()
-        annotated_images = self._annotated_images_series
         annotated_images.sort(key=lambda x: x.datetime)
         s0, s1 = annotated_images[0:2]
         for i, _ in enumerate(annotated_images[1:-1]):
@@ -102,10 +109,10 @@ class Matcher(object):
         tuboids = []
         for sub_graph in nx.weakly_connected_components(dg):
             annotations = [nd[1]['annotation'] for nd in dg.subgraph(sub_graph).nodes(data=True)]
-            tuboids.append(Tuboid(annotations, self._ml_bundle.version, parent_series=self._annotated_images_series))
+            tuboids.append(Tuboid(annotations, self._ml_bundle.version, parent_series=annotated_images))
         return tuboids
 
-    def _stitch_sub_graphs(self, tuboids: List[Tuboid]) -> List[Tuboid]:
+    def _stitch_sub_graphs(self, tuboids: List[Tuboid], annotated_images_series: ImageSeries) -> List[Tuboid]:
         ntub = len(tuboids)
         if ntub < 2:
             return tuboids
@@ -134,7 +141,7 @@ class Matcher(object):
                 # place holder to later delete without changing the indices yet
                 tuboids[tb] = None
             merged_tuboid = Tuboid(annots_to_merge, self._ml_bundle.version,
-                                   parent_series=self._annotated_images_series)
+                                   parent_series=annotated_images_series)
 
             tuboids.append(merged_tuboid)
         tuboids = [tb for tb in tuboids if tb is not None]
@@ -145,7 +152,7 @@ class Matcher(object):
     # * they have no coincident reads
     # Typically, conjoint tuboids are the same instance, but falsely clustered as multiple ones.
     # the goal is to iteratively merge conjoint tuboids
-    def _merge_conjoint_tuboids(self, tuboids, iteration=0):
+    def _merge_conjoint_tuboids(self, tuboids, annotated_images_series: ImageSeries, iteration=0):
         ntub = len(tuboids)
         if ntub < 2:
             return tuboids
@@ -169,11 +176,11 @@ class Matcher(object):
         tb1 = tuboids.pop(j)
         tb0 = tuboids.pop(i)
 
-        merged_tuboid = Tuboid(tb1 + tb0, self._ml_bundle.version, parent_series=self._annotated_images_series)
+        merged_tuboid = Tuboid(tb1 + tb0, self._ml_bundle.version, parent_series=annotated_images_series)
         tuboids.append(merged_tuboid)
 
         # we recurse as still need to merge some tuboids
-        tuboids = self._merge_conjoint_tuboids(tuboids, iteration=iteration + 1)
+        tuboids = self._merge_conjoint_tuboids(tuboids, annotated_images_series, iteration=iteration + 1)
         return tuboids
 
     @lru_cache(maxsize=None)
@@ -192,12 +199,13 @@ class Matcher(object):
                     return False
         return True
 
-    def _clean_up(self):
+    def _clean_up(self, annotated_images_series: ImageSeries):
         logging.info('deleting img cache!')
-        for im in self._annotated_images_series:
+        for im in annotated_images_series:
             im.clear_cache()
 
-    def make_video(self, tuboids, out, scale=(1600, 1200), fps=4, show=False):
+    @staticmethod
+    def make_video(tuboids, out, annotated_images_series: ImageSeries, scale=(1600, 1200), fps=4, show=False):
         import cv2
 
         def col_lut(id):
@@ -210,9 +218,9 @@ class Matcher(object):
         logging.info('Saving video in %s' % out)
 
         try:
-            for i, s in enumerate(self._annotated_images_series):
+            for i, s in enumerate(annotated_images_series):
                 im = np.copy(s.read())
-                logging.info('Processing %s (%i/%i)' % (s.filename, i, len(self._annotated_images_series)))
+                logging.info('Processing %s (%i/%i)' % (s.filename, i, len(annotated_images_series)))
                 for j, t in enumerate(tuboids):
                     assert s.device == t.device
                     bbox, inferred = t.bbox_at_datetime(s.datetime)

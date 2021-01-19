@@ -1,7 +1,7 @@
 import logging
 import os
 from sticky_pi_ml.utils import MLScriptParser
-from sticky_pi_api.client import LocalClient #, RemoteClient
+from sticky_pi_api.client import LocalClient, RemoteClient
 from sticky_pi_ml.siamese_insect_matcher.ml_bundle import ClientMLBundle
 from sticky_pi_ml.siamese_insect_matcher.trainer import Trainer
 from sticky_pi_ml.siamese_insect_matcher.predictor import Predictor
@@ -13,6 +13,17 @@ BUNDLE_NAME = 'siamese-insect-matcher'
 CANDIDATE_DIR = "candidates"
 PREDICT_VIDEO_DIR = "videos"
 VALIDATION_OUT_DIR = 'validation_results'
+
+
+def make_client(opt_dict):
+    if opt_dict['local_api']:
+        out = LocalClient(opt_dict['LOCAL_CLIENT_DIR'])
+    else:
+        out = RemoteClient(opt_dict['LOCAL_CLIENT_DIR'],
+                           opt_dict['API_HOST'],
+                           opt_dict['API_USER'],
+                           opt_dict['API_PASSWORD'])
+    return out
 
 
 def make_series(i: int):
@@ -32,20 +43,20 @@ def make_series(i: int):
 if __name__ == '__main__':
     parser = MLScriptParser()
     option_dict = parser.get_opt_dict()
-
     bundle_dir = os.path.join(option_dict['BUNDLE_ROOT_DIR'], BUNDLE_NAME)
     ml_bundle_cache = os.path.join(bundle_dir,'.cache')
     os.makedirs(ml_bundle_cache, exist_ok=True)
 
 
     if option_dict['action'] == 'fetch':
-        #todo use remote client here
-        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        client = make_client(option_dict)
+        # client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'])
         ml_bundle.sync_remote_to_local()
 
     elif option_dict['action'] == 'candidates':
-        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        client = make_client(option_dict)
+        # client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
         os.makedirs(CANDIDATE_DIR, exist_ok=True)
         make_candidates(client, out_dir=CANDIDATE_DIR)
 
@@ -54,7 +65,8 @@ if __name__ == '__main__':
         raise NotImplementedError
 
     elif option_dict['action'] == 'validate':
-        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        client = make_client(option_dict)
+        # client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
         t = Trainer(ml_bundle)
         predictor = Predictor(ml_bundle)
@@ -62,7 +74,8 @@ if __name__ == '__main__':
 
 
     elif option_dict['action'] == 'train':
-        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        client = make_client(option_dict)
+        # client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
         t = Trainer(ml_bundle)
         t.resume_or_load(resume=not option_dict['restart_training'])
@@ -78,14 +91,16 @@ if __name__ == '__main__':
             logging.warning('No environment variable named SLURM_ARRAY_TASK_ID. Making series in order instead!')
             series = make_series(None)
 
-        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        # client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+        client = make_client(option_dict)
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
         matcher = Matcher(ml_bundle)
         for s in series:
             out = matcher.match_client(s, video_dir= PREDICT_VIDEO_DIR)
 
     elif option_dict['action'] == 'push':
-        #todo use remote client here
-        client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
+
+        client = make_client(option_dict)
+        # client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'])
         ml_bundle.sync_local_to_remote()
