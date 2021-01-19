@@ -89,7 +89,6 @@ class TestUID(unittest.TestCase):
             pred._version = '1604062778-262624ad1767b977801645a8addefbe6'
             pred.detect_client()
 
-
             # # second time should do nothing
             # pred.detect_client()
             print('bump version!!================================================')

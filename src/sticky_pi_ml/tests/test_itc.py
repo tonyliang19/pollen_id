@@ -92,7 +92,16 @@ class TestITC(unittest.TestCase):
             bndl.sync_local_to_remote()
 
             tiled_tub_dirs = [os.path.dirname(im) for im in sorted(glob.glob(os.path.join(self._tiled_tuboid_dir, '**','**', 'tuboid.jpg')))]
-            cli.put_tiled_tuboids(tiled_tub_dirs)
+            cli.put_tiled_tuboids(tiled_tub_dirs,
+                                  series_info={'algo_name':'abcd',
+                                               'algo_version': 'abcde',
+                                               'device': '08038ade',
+                                               'start_datetime': '2020-01-01_00-00-00',
+                                               'end_datetime': '2021-01-01_00-00-00',
+                                               'n_images':11,
+                                               'n_tuboids':6},
+
+                                  )
 
             pred = MockPredictor(bndl)
             pred._version = '1604062778-262624ad1767b977801645a8addefbe6'
