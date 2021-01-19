@@ -12,7 +12,7 @@ class BaseMLBundle(ABC):
     _config_filename = 'config.yaml'
     _output_dirname = 'output'   #
     _model_filename = 'model_final.pth'
-
+    _version_filename = '.version.txt'
     _name = None
     _DatasetClass = None  # must be implemented
 
@@ -92,11 +92,29 @@ class BaseMLBundle(ABC):
     def version(self):
         file = self._weight_file
         m = md5(file)
-        return "%i-%s" % (os.path.getmtime(file), m)
+        version_file = os.path.join(self._root_dir, self._version_filename)
+
+        if not os.path.isfile(version_file):
+            self._tag_version(file, m)
+
+        with open(version_file, 'r') as f:
+            t, md5sum = f.read().rstrip().split('-')
+        t = int(t)
+
+        if m != md5sum:
+            self._tag_version(file, m)
+        else:
+            mtime = t
+        return "%i-%s" % (mtime, m)
+
+    def _tag_version(self, file, md5sum):
+        mtime = os.path.getmtime(file)
+        with open(os.path.join(self._root_dir, self._version_filename), 'w') as f:
+            f.write("%i-%s" % (mtime, md5sum))
+            logging.info('Local version md5 different from version file. Tagging new version: "%i-%s"' % (mtime, md5sum))
     @property
     def weight_file(self):
         return self._weight_file
-
 
 class BaseClientMLBundle(BaseMLBundle, ABC):
     def __init__(self, root_dir: str, client: BaseClient, device: str = 'cpu', cache_dir=None):
@@ -109,6 +127,11 @@ class BaseClientMLBundle(BaseMLBundle, ABC):
 
     def sync_local_to_remote(self, what: str = 'all'):
         assert what in {'all', 'data', 'model'}
+        # we trigger version tagging
+        try:
+            _ = self.version
+        except FileNotFoundError as e:
+            logging.warning(e)
         self._client.put_ml_bundle_dir(self._name, self._root_dir, what)
 
     def sync_remote_to_local(self, what: str = 'all'):
