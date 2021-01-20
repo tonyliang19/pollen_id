@@ -20,9 +20,9 @@ class BaseMLBundle(ABC):
         """
         An abstract class that organises all the components of a ML project:
 
-        * training/validation data files
-        * configuration files
-        * weight files (i.e. pretrained or resulting of training)
+        * training/validation data files -- in ``/data``
+        * configuration files -- in ``/config``
+        * weight files (i.e. pretrained or resulting of training)  -- in ``/output``
 
         All components are stored in ``root_dir`` and the class provided utilities to parse inputs, generate ``torch``
         datasets, synchronise the data to an API...

@@ -116,8 +116,10 @@ class Dataset(BaseDataset):
                 self._training_data.append(entry)
 
     def _serialise_imgs_to_dicts(self):
-
-        conn = sqlite3.connect(os.path.join(self._data_dir, self._annotations_filename))
+        sqlite_file = os.path.join(self._data_dir, self._annotations_filename)
+        if not os.path.isfile(sqlite_file):
+            raise FileNotFoundError(f'No database file found: {sqlite_file}')
+        conn = sqlite3.connect(sqlite_file)
         try:
             annotations_df = pd.read_sql_query("select * from %s;" % self._annotations_table_name, conn)
         finally:
