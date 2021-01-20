@@ -34,9 +34,11 @@ class Trainer(OriginalTrainer):
 bndl = MLBundle(ML_BUNDLE_DIR)
 
 trainer = Trainer(bndl)
-# this will print statistics about the data 'PATTERN (LABEL) -> N', where LABEL  is an integer (>=0),
+
+# This next command should print statistics about the data 'PATTERN (LABEL) -> N', where LABEL  is an integer (>=0),
 # N, the number of individual in the dataset, PATTERN, a regex matching "the label"
 trainer.resume_or_load(resume=False)
+
 trainer.train()
 
 
