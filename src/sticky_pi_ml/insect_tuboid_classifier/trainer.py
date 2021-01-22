@@ -8,7 +8,6 @@ import torch.optim as optim
 import numpy as np
 import os
 import logging
-from sklearn.metrics import confusion_matrix, classification_report
 
 
 
@@ -110,6 +109,7 @@ class Trainer(BaseTrainer):
                 to_validate = False
 
     def _validate(self, model, data_loader, criterion, device, n_classes):
+
         with torch.no_grad():
             epoch_labels = []
             epoch_preds = []
@@ -131,8 +131,14 @@ class Trainer(BaseTrainer):
                 all_losses += [loss.item()] * len(labels)
                 epoch_labels.extend(labels_d)
                 epoch_preds.extend(preds_d)
+                print('VALIDATION:', np.mean(np.array(epoch_labels) == np.array(epoch_preds)), np.mean(all_losses))
+            try:
+                from sklearn.metrics import confusion_matrix, classification_report
+                print(confusion_matrix(epoch_labels, epoch_preds, labels=np.arange(0, n_classes)))
+                print(classification_report(epoch_labels, epoch_preds, labels=np.arange(0, n_classes)))
+            except ImportError as e:
+                logging.error("Cannot load sklearn")
+                logging.error(e)
 
-            print('VALIDATION:', np.mean(np.array(epoch_labels) == np.array(epoch_preds)), np.mean(all_losses))
-            print(confusion_matrix(epoch_labels, epoch_preds, labels=np.arange(0, n_classes)))
-            print(classification_report(epoch_labels, epoch_preds, labels=np.arange(0, n_classes)))
+
 
