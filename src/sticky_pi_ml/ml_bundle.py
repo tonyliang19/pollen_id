@@ -102,16 +102,18 @@ class BaseMLBundle(ABC):
         t = int(t)
 
         if m != md5sum:
-            self._tag_version(file, m)
+            return self._tag_version(file, m)
         else:
             mtime = t
-        return "%i-%s" % (mtime, m)
+            return "%i-%s" % (mtime, m)
 
     def _tag_version(self, file, md5sum):
         mtime = os.path.getmtime(file)
+        version = "%i-%s" % (mtime, md5sum)
         with open(os.path.join(self._output_dir, self._version_filename), 'w') as f:
-            f.write("%i-%s" % (mtime, md5sum))
+            f.write(version)
             logging.info('Local version md5 different from version file. Tagging new version: "%i-%s"' % (mtime, md5sum))
+        return version
     @property
     def weight_file(self):
         return self._weight_file

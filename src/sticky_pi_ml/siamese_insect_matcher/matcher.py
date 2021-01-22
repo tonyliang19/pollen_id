@@ -31,24 +31,34 @@ class Matcher(object):
         client = self._ml_bundle.client
         logging.info('Processing series %s' % annotated_images_series)
 
-        annotated_images_series.populate_from_client(client)
-
-        if len(annotated_images_series) < 3:
-            logging.warning('Only %i annotated images in %s. Need 3 at least!' % (
-                len(annotated_images_series), annotated_images_series))
-            return
-        already_present_tuboids = pd.DataFrame(client.get_tiled_tuboid_series([annotated_images_series.info_dict]))
-
-        if 'algo_version' in already_present_tuboids.columns and \
-                len(already_present_tuboids[already_present_tuboids.algo_version == self._ml_bundle.version]) > 0:
-            logging.warning('Series %s already has matches on the client. Skipping.' % annotated_images_series)
-            return
-
-        # if match, we skip
-        tuboids = self.match(annotated_images_series)
         temp_dir = tempfile.mkdtemp()
         try:
-            to_upload = [TiledTuboid.from_tuboid(t, temp_dir).directory for t in tuboids]
+            cache_image_dir = os.path.join(temp_dir, "cache_images")
+            os.makedirs(cache_image_dir)
+            already_present_tuboids = pd.DataFrame(client.get_tiled_tuboid_series([annotated_images_series.info_dict]))
+            if 'algo_version' in already_present_tuboids.columns > 0:
+                same_algo_tuboids = already_present_tuboids[
+                    already_present_tuboids.algo_version == self._ml_bundle.version]
+                n_same_algo = len(same_algo_tuboids)
+                if n_same_algo > 0:
+                    expected_n_same_algo = same_algo_tuboids.iloc[0].n_tuboids
+                    if expected_n_same_algo != n_same_algo:
+                        logging.error(f"Upstream tuboid series partially uploaded: expected {expected_n_same_algo}, but only contains {n_same_algo}")
+                        return
+                    else:
+                        logging.infp('Series %s already been analysed by the same algorithm, and is complete.'
+                                     'Skipping.' % annotated_images_series)
+                        return
+            annotated_images_series.populate_from_client(client, cache_image_dir=cache_image_dir)
+
+            if len(annotated_images_series) < 3:
+                logging.warning('Only %i annotated images in %s. Need 3 at least!' % (
+                    len(annotated_images_series), annotated_images_series))
+            tuboids = self.match(annotated_images_series)
+
+            tuboid_temp_dir = os.path.join(temp_dir, "cache_tuboids")
+            os.makedirs(tuboid_temp_dir)
+            to_upload = [TiledTuboid.from_tuboid(t, tuboid_temp_dir).directory for t in tuboids]
             if video_dir is not None:
                 self.make_video(tuboids, os.path.join(video_dir, annotated_images_series.name + '.mp4'),
                                 annotated_images_series=annotated_images_series)
