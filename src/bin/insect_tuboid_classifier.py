@@ -1,4 +1,3 @@
-import logging
 import os
 from sticky_pi_ml.utils import MLScriptParser
 from sticky_pi_api.client import LocalClient, RemoteClient
