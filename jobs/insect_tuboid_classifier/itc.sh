@@ -4,7 +4,7 @@ source ../.secret.env
 PROGRAM=insect_tuboid_classifier.py
 
 echo Training using option "$1"
-command="module load cuda cudnn && source ${VIRT_ENV_LOCATION}/bin/activate && ${PROGRAM} $1 -v"
+command="module load cuda cudnn && module load scipy-stack && source ${VIRT_ENV_LOCATION}/bin/activate && ${PROGRAM} $1 -v"
 
 output=$0_$1_$(date +%F_%H-%M-%S)_%N_%j.out
 JOBNAME=$0.$1
