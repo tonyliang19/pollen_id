@@ -84,7 +84,7 @@ class Predictor(BasePredictor):
                         with open(os.path.join(temp_dir, filename), 'wb') as file:
                             file.write(resp)
                         u = os.path.join(temp_dir, filename)
-                    # print(u)
+
                     im = Image(u)
                     annotated_im = self.detect(im, *args, **kwargs)
                     logging.info('Detecting in image %s' % im)

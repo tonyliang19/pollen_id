@@ -106,7 +106,7 @@ class Trainer(BaseTrainer):
                 print("VALIDATION")
                 self._validate(model, dataloaders_dict['val'], criterion, device, n_classes)
                 print('SNAPSHOOTING')
-                torch.save(self._net.state_dict(), self._config.weights)
+                torch.save(self._net.state_dict(), self._config['WEIGHTS'])
                 to_validate = False
 
     def _validate(self, model, data_loader, criterion, device, n_classes):
@@ -119,7 +119,6 @@ class Trainer(BaseTrainer):
                 for k, v in inputs.items():
                     if torch.is_tensor(v):
                         inputs[k] = inputs[k].to(device)
-                print(len(all_losses))
 
                 labels = labels.to(device)
                 outputs = model(inputs)
@@ -128,12 +127,12 @@ class Trainer(BaseTrainer):
                 # # statistics
                 labels_d = labels.detach()
                 preds_d = preds.detach()
-                all_losses += [loss.item()]
 
+                all_losses += [loss.item()] * len(labels)
                 epoch_labels.extend(labels_d)
                 epoch_preds.extend(preds_d)
 
-            print('VALIDATION:', np.mean(epoch_labels == epoch_preds), np.mean(all_losses))
+            print('VALIDATION:', np.mean(np.array(epoch_labels) == np.array(epoch_preds)), np.mean(all_losses))
             print(confusion_matrix(epoch_labels, epoch_preds, labels=np.arange(0, n_classes)))
             print(classification_report(epoch_labels, epoch_preds, labels=np.arange(0, n_classes)))
 

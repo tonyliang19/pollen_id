@@ -50,13 +50,11 @@ if __name__ == '__main__':
 
     if option_dict['action'] == 'fetch':
         client = make_client(option_dict)
-        # client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'])
         ml_bundle.sync_remote_to_local()
 
     elif option_dict['action'] == 'candidates':
         client = make_client(option_dict)
-        # client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
         os.makedirs(CANDIDATE_DIR, exist_ok=True)
         make_candidates(client, out_dir=CANDIDATE_DIR)
 
@@ -75,7 +73,6 @@ if __name__ == '__main__':
 
     elif option_dict['action'] == 'train':
         client = make_client(option_dict)
-        # client = LocalClient(option_dict['LOCAL_CLIENT_DIR'])
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
         t = Trainer(ml_bundle)
         t.resume_or_load(resume=not option_dict['restart_training'])
@@ -96,7 +93,7 @@ if __name__ == '__main__':
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
         matcher = Matcher(ml_bundle)
         for s in series:
-            out = matcher.match_client(s, video_dir= PREDICT_VIDEO_DIR)
+            out = matcher.match_client(s, video_dir = PREDICT_VIDEO_DIR)
 
     elif option_dict['action'] == 'push':
 

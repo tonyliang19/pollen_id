@@ -128,9 +128,14 @@ class Dataset(BaseDataset):
         annotations_df.sort_values("datetime", inplace=True)
 
         # fixme should remove duplicates/ find consensus (e.g. the deepest)
+        # for now, we drop duplicates, keeping the last annotation
         annotations_df.drop_duplicates(['tuboid_id'], keep='last', inplace=True)
         annotations_df.set_index('tuboid_id', inplace=True)
-
+        l1 = len(annotations_df)
+        # don't train with ambiguous data (e.g. stitching / segmentation errors)
+        annotations_df = annotations_df[annotations_df.type != 'Ambiguous']
+        l2 = len(annotations_df)
+        logging.info(f"Dropping {l1 - l2} ambiguous rows")
         entries = []
 
         for t, r in annotations_df.iterrows():
