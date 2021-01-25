@@ -1,6 +1,4 @@
-from sticky_pi_ml.trainer import BaseTrainer
-from sticky_pi_ml.insect_tuboid_classifier.ml_bundle import MLBundle
-from sticky_pi_ml.insect_tuboid_classifier.model import make_resnet
+import datetime
 import torch
 import torch.nn as nn
 import torch.utils.data
@@ -9,6 +7,9 @@ import numpy as np
 import os
 import logging
 
+from sticky_pi_ml.trainer import BaseTrainer
+from sticky_pi_ml.insect_tuboid_classifier.ml_bundle import MLBundle
+from sticky_pi_ml.insect_tuboid_classifier.model import make_resnet
 
 
 class Trainer(BaseTrainer):
@@ -31,8 +32,8 @@ class Trainer(BaseTrainer):
             else:
                 logging.info("Starting from checkpoint")
                 self._net = make_resnet(pretrained=False, n_classes=self._ml_bundle.dataset.n_classes)
-
-                self._net.load_state_dict(torch.load(weights))
+                map = None if torch.cuda.is_available() else 'cpu'
+                self._net.load_state_dict(torch.load(weights, map_location=map))
         else:
             logging.info("Training from start")
             self._net = make_resnet(pretrained=True, n_classes=self._ml_bundle.dataset.n_classes)
@@ -59,10 +60,10 @@ class Trainer(BaseTrainer):
         training_round = 0
         to_validate = False
 
-        print("VALIDATION")
         self._validate(model, dataloaders_dict['val'], criterion, device, n_classes)
 
         while True:
+            all_losses = []
             for i, (inputs, labels) in enumerate(dataloaders_dict['train'], 0):
                 if training_round >= n_rounds:
                     return
@@ -91,10 +92,11 @@ class Trainer(BaseTrainer):
                     running_loss = loss.item()
 
                 running_loss = running_loss * 0.95 + loss.item() * 0.05
-                # print(np.round(f.detach().numpy().flatten(), 3))
+                all_losses.append(loss.item())
+                #
+                # print('TRAINING: Round %i; Accuracy %f;Running loss %f; Loss %f, LR %f' % (
+                #     training_round, torch.mean((labels_d == preds_d).float()).item(), running_loss, loss.item(), lr))
 
-                print('TRAINING: Round %i; Accuracy %f;Running loss %f; Loss %f, LR %f' % (
-                    training_round, torch.mean((labels_d == preds_d).float()).item(), running_loss, loss.item(), lr))
 
                 training_round += 1
                 if training_round % self._save_every == self._save_every - 1:
@@ -102,14 +104,14 @@ class Trainer(BaseTrainer):
                     break
 
             if to_validate:
-                print("VALIDATION")
+                print('TRAINING:', torch.mean((labels_d == preds_d).float()).item(), np.mean(all_losses),
+                      str(datetime.datetime.now()))
                 self._validate(model, dataloaders_dict['val'], criterion, device, n_classes)
-                print('SNAPSHOOTING')
+                print('SNAPSHOOTING', str(datetime.datetime.now()))
                 torch.save(self._net.state_dict(), self._config['WEIGHTS'])
                 to_validate = False
 
     def _validate(self, model, data_loader, criterion, device, n_classes):
-
         with torch.no_grad():
             epoch_labels = []
             epoch_preds = []
@@ -131,7 +133,9 @@ class Trainer(BaseTrainer):
                 all_losses += [loss.item()] * len(labels)
                 epoch_labels.extend(labels_d)
                 epoch_preds.extend(preds_d)
-                print('VALIDATION:', np.mean(np.array(epoch_labels) == np.array(epoch_preds)), np.mean(all_losses))
+
+            print('VALIDATION:', np.mean(np.array(epoch_labels) == np.array(epoch_preds)), np.mean(all_losses),
+                  str(datetime.datetime.now()))
             try:
                 from sklearn.metrics import confusion_matrix, classification_report
                 print(confusion_matrix(epoch_labels, epoch_preds, labels=np.arange(0, n_classes)))
