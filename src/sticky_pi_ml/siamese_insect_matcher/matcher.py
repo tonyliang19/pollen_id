@@ -59,14 +59,16 @@ class Matcher(object):
             tuboid_temp_dir = os.path.join(temp_dir, "cache_tuboids")
             os.makedirs(tuboid_temp_dir)
             to_upload = [TiledTuboid.from_tuboid(t, tuboid_temp_dir).directory for t in tuboids]
-            if video_dir is not None:
-                self.make_video(tuboids, os.path.join(video_dir, annotated_images_series.name + '.mp4'),
-                                annotated_images_series=annotated_images_series)
 
             series_info['n_images'] = len(annotated_images_series)
             series_info['n_tuboids'] = len(to_upload)
 
             client.put_tiled_tuboids(to_upload, series_info=series_info)
+            logging.info('Series %s uploaded!' % annotated_images_series)
+            if video_dir is not None:
+                self.make_video(tuboids, os.path.join(video_dir, annotated_images_series.name + '.mp4'),
+                                annotated_images_series=annotated_images_series)
+
             logging.info('Done with series %s' % annotated_images_series)
             return tuboids
         finally:
