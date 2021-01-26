@@ -108,12 +108,26 @@ class Dataset(BaseDataset):
 
     def _prepare(self):
         data = self._serialise_imgs_to_dicts()
-        while len(data) > 0:
+        # we force each label to have a set proportion of the sample size for this label
+
+        label_dict = {}
+        for d in data:
             entry = data.pop()
-            if entry['tuboid'].md5 > self._md5_max_training:
-                self._validation_data.append(entry)
-            else:
-                self._training_data.append(entry)
+            if not entry['label'] in label_dict.keys():
+                label_dict[entry['label']] = []
+            label_dict[entry['label']].append(entry)
+        for label in label_dict.keys():
+            label_dict[label].sort(key=lambda x: x['tuboid'].md5)
+
+        prop_training = int(self._md5_max_training, 16) / int('ff', 16)
+        for label in label_dict.keys():
+            total_label = len(label_dict[label])
+            for i, e in enumerate(label_dict[label]):
+
+                if i < int(total_label * prop_training):
+                    self._validation_data.append(e)
+                else:
+                    self._training_data.append(e)
 
     def _serialise_imgs_to_dicts(self):
         sqlite_file = os.path.join(self._data_dir, self._annotations_filename)
