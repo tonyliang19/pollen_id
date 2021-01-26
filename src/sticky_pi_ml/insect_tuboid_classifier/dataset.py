@@ -123,11 +123,17 @@ class Dataset(BaseDataset):
         for label in label_dict.keys():
             total_label = len(label_dict[label])
             for i, e in enumerate(label_dict[label]):
-
                 if i < int(total_label * prop_training):
-                    self._validation_data.append(e)
-                else:
                     self._training_data.append(e)
+                else:
+                    self._validation_data.append(e)
+
+
+        self._training_data.sort(key=lambda x: x['tuboid'].md5)
+        self._validation_data.sort(key=lambda x: x['tuboid'].md5)
+        print('len(self._training_data)')
+        print(len(self._training_data))
+        print(len(self._validation_data))
 
     def _serialise_imgs_to_dicts(self):
         sqlite_file = os.path.join(self._data_dir, self._annotations_filename)

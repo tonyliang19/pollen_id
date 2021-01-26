@@ -1,3 +1,4 @@
+import requests
 import tempfile
 import shutil
 import os
@@ -24,7 +25,9 @@ class Predictor(BasePredictor):
         self._net = self._make_net()
         self._taxonomy_mapper = self._ml_bundle.dataset.taxonomy_mapper
         weights = self._ml_bundle.weight_file
-        self._net.load_state_dict(torch.load(weights))
+
+        map = None if torch.cuda.is_available() else 'cpu'
+        self._net.load_state_dict(torch.load(weights, map_location=map))
         self._net.eval()
 
     def _make_net(self):
@@ -76,17 +79,29 @@ class Predictor(BasePredictor):
                 tuboid_dir = os.path.join(temp_dir, r['tuboid_id'])
                 os.makedirs(tuboid_dir)
                 for f in ['metadata', 'tuboid', 'context']:
-                    shutil.copy(r[f], tuboid_dir)
+                    if os.path.isfile(r[f]):
+                        shutil.copy(r[f], tuboid_dir)
+                    else:
+                        filename = os.path.basename(r[f]).split('?')[0]
+                        logging.info(f'Downloading {filename}')
+                        resp = requests.get(r[f]).content
+
+                        print(r[f])
+                        with open(os.path.join(tuboid_dir, filename), 'wb') as file:
+                            file.write(resp)
+                            print(os.path.join(tuboid_dir, filename))
 
                 tiled_tuboid = TiledTuboid(tuboid_dir)
+                print('tiled_tuboid')
+                print(tiled_tuboid)
                 prediction = self.predict(tiled_tuboid)
             finally:
-                shutil.rmtree(temp_dir)
+                print(temp_dir)
+                # shutil.rmtree(temp_dir)
 
             prediction['algo_version'] = self.version
             prediction['algo_name'] = self.name
             prediction['tuboid_id'] = r['tuboid_id']
-
             logging.info('Prediction: %s' % prediction)
 
             all_predictions.append(prediction)
