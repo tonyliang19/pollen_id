@@ -64,6 +64,8 @@ class Trainer(BaseTrainer):
 
         while True:
             all_losses = []
+            all_accu = []
+
             for i, (inputs, labels) in enumerate(dataloaders_dict['train'], 0):
                 if training_round >= n_rounds:
                     return
@@ -92,8 +94,10 @@ class Trainer(BaseTrainer):
                     running_loss = loss.item()
 
                 running_loss = running_loss * 0.95 + loss.item() * 0.05
+
                 all_losses.append(loss.item())
-                #
+                all_accu.append(torch.mean((labels_d == preds_d).float()).item())
+
                 # print('TRAINING: Round %i; Accuracy %f;Running loss %f; Loss %f, LR %f' % (
                 #     training_round, torch.mean((labels_d == preds_d).float()).item(), running_loss, loss.item(), lr))
 
@@ -104,7 +108,7 @@ class Trainer(BaseTrainer):
                     break
 
             if to_validate:
-                print('TRAINING:', torch.mean((labels_d == preds_d).float()).item(), np.mean(all_losses),
+                print('TRAINING:', np.mean(all_accu), np.mean(all_losses),
                       str(datetime.datetime.now()))
                 self._validate(model, dataloaders_dict['val'], criterion, device, n_classes)
                 print('SNAPSHOOTING', str(datetime.datetime.now()))
@@ -141,8 +145,8 @@ class Trainer(BaseTrainer):
                 print(confusion_matrix(epoch_labels, epoch_preds, labels=np.arange(0, n_classes)))
                 print(classification_report(epoch_labels, epoch_preds, labels=np.arange(0, n_classes)))
             except ImportError as e:
-                logging.error("Cannot load sklearn")
-                logging.error(e)
+                pass
+
 
 
 
