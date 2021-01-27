@@ -20,6 +20,7 @@ from cairosvg import svg2png
 import svgpathtools
 from typing import Union
 import pandas as pd
+import requests
 
 from sticky_pi_api.utils import datetime_to_string, string_to_datetime
 from sticky_pi_api.client import BaseClient
@@ -93,7 +94,6 @@ class ImageSeries(list):
                         raise FileNotFoundError(f'The requested image appears to be a remote url: {r["url"]}.'
                                                 f'For this type of resource, a valid cache image directory is needed!')
 
-                    import requests
                     filename = os.path.basename(r['url']).split('?')[0]
                     logging.info(f'Downloading {filename}')
                     resp = requests.get(r['url']).content

@@ -167,6 +167,7 @@ class TiledTuboid(list):
                 scale = float(scale)
                 o = {'datetime': annotation_datetime, 'center': center, 'scale': scale}
                 self.append(o)
+        assert self._n_tiles > 1, f'Only {self._n_tiles} tiles found. need at least 2'
 
     @property
     def md5(self):
@@ -224,6 +225,8 @@ class TiledTuboid(list):
             if (tuboid[i].datetime - tuboid.head_datetime).total_seconds() <= cls._max_tuboid_duration:
                 images_to_save.append(im)
 
+        assert len(metadata_lines) > 2
+
         n_to_save = len(images_to_save)
         n_rows = 1 + (n_to_save - 1) // 4
         out_array = np.zeros((n_rows * tile_width, tile_width * 4, 3), dtype=np.uint8)
@@ -244,6 +247,7 @@ class TiledTuboid(list):
 
         with open(os.path.join(tuboid_dir, cls.metadata_tuboid_filename), 'w') as f:
             f.writelines(metadata_lines)
+
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 100]
         cv2.imwrite(os.path.join(tuboid_dir, cls.tiles_tuboid_filename), out_array,
                     params=encode_param)

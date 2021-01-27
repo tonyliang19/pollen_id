@@ -1,3 +1,7 @@
+import requests
+import os
+import tempfile
+import shutil
 import cv2
 import numpy as np
 import torch
@@ -71,10 +75,6 @@ class Predictor(BasePredictor):
 
             all_annots = []
             for u in urls:
-                import requests
-                import os
-                import tempfile
-                import shutil
                 temp_dir = None
                 try:
                     if not os.path.isfile(u):

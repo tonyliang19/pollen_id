@@ -111,15 +111,18 @@ class Dataset(BaseDataset):
         # we force each label to have a set proportion of the sample size for this label
 
         label_dict = {}
-        for d in data:
+
+        while len(data) > 0:
             entry = data.pop()
             if not entry['label'] in label_dict.keys():
                 label_dict[entry['label']] = []
             label_dict[entry['label']].append(entry)
+
         for label in label_dict.keys():
             label_dict[label].sort(key=lambda x: x['tuboid'].md5)
 
         prop_training = int(self._md5_max_training, 16) / int('ff', 16)
+
         for label in label_dict.keys():
             total_label = len(label_dict[label])
             for i, e in enumerate(label_dict[label]):
@@ -128,12 +131,8 @@ class Dataset(BaseDataset):
                 else:
                     self._validation_data.append(e)
 
-
         self._training_data.sort(key=lambda x: x['tuboid'].md5)
         self._validation_data.sort(key=lambda x: x['tuboid'].md5)
-        print('len(self._training_data)')
-        print(len(self._training_data))
-        print(len(self._validation_data))
 
     def _serialise_imgs_to_dicts(self):
         sqlite_file = os.path.join(self._data_dir, self._annotations_filename)

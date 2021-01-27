@@ -10,7 +10,6 @@ class BaseTrainer(ABC):
     def train(self):
         raise NotImplementedError()
 
-
     def resume_or_load(self, resume: bool = True):
         raise NotImplementedError()
 
