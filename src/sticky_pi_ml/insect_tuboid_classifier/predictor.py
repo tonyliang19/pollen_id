@@ -85,19 +85,14 @@ class Predictor(BasePredictor):
                         filename = os.path.basename(r[f]).split('?')[0]
                         logging.info(f'Downloading {filename}')
                         resp = requests.get(r[f]).content
-
-                        print(r[f])
                         with open(os.path.join(tuboid_dir, filename), 'wb') as file:
                             file.write(resp)
                             print(os.path.join(tuboid_dir, filename))
 
                 tiled_tuboid = TiledTuboid(tuboid_dir)
-                print('tiled_tuboid')
-                print(tiled_tuboid)
                 prediction = self.predict(tiled_tuboid)
             finally:
-                print(temp_dir)
-                # shutil.rmtree(temp_dir)
+                shutil.rmtree(temp_dir)
 
             prediction['algo_version'] = self.version
             prediction['algo_name'] = self.name
