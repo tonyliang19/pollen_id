@@ -60,11 +60,12 @@ class Trainer(BaseTrainer):
         training_round = 0
         to_validate = False
 
-        self._validate(model, dataloaders_dict['val'], criterion, device, n_classes)
-
+        self._validate(model, dataloaders_dict['val'], criterion, device, n_classes, 0, base_lr)
+        
         while True:
             all_losses = []
             all_accu = []
+            model.train()
 
             for i, (inputs, labels) in enumerate(dataloaders_dict['train'], 0):
                 if training_round >= n_rounds:
@@ -108,14 +109,19 @@ class Trainer(BaseTrainer):
                     break
 
             if to_validate:
-                print('TRAINING:', np.mean(all_accu), np.mean(all_losses),
+                print('TRAINING:',
+                      training_round,
+                      lr,
+                      np.mean(all_accu),
+                      np.mean(all_losses),
                       str(datetime.datetime.now()))
-                self._validate(model, dataloaders_dict['val'], criterion, device, n_classes)
+                self._validate(model, dataloaders_dict['val'], criterion, device, n_classes, training_round, lr)
                 print('SNAPSHOOTING', str(datetime.datetime.now()))
                 torch.save(self._net.state_dict(), self._config['WEIGHTS'])
                 to_validate = False
 
-    def _validate(self, model, data_loader, criterion, device, n_classes):
+    def _validate(self, model, data_loader, criterion, device, n_classes,training_round, lr):
+        model.eval()
         with torch.no_grad():
             epoch_labels = []
             epoch_preds = []
@@ -138,7 +144,11 @@ class Trainer(BaseTrainer):
                 epoch_labels.extend(labels_d)
                 epoch_preds.extend(preds_d)
 
-            print('VALIDATION:', np.mean(np.array(epoch_labels) == np.array(epoch_preds)), np.mean(all_losses),
+            print('VALIDATION:',
+                  training_round,
+                  lr,
+                  np.mean(np.array(epoch_labels) == np.array(epoch_preds)),
+                  np.mean(all_losses),
                   str(datetime.datetime.now()))
             try:
                 from sklearn.metrics import confusion_matrix, classification_report
