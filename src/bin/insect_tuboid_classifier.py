@@ -45,7 +45,6 @@ if __name__ == '__main__':
 
     elif option_dict['action'] == 'train':
         client = make_client(option_dict)
-        print(bundle_dir)
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
         t = Trainer(ml_bundle)
         t.resume_or_load(resume=not option_dict['restart_training'])
@@ -55,7 +54,7 @@ if __name__ == '__main__':
         client = make_client(option_dict)
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
         predictor = Predictor(ml_bundle)
-        predictor.predict_client(device="%", start_datetime="2020-01-01_00-00-00", end_datetime="2100-01-01_00-00-00")
+        predictor.predict_client(device="%", start_datetime="2020-06-01_00-00-00", end_datetime="2100-01-01_00-00-00")
 
 
     elif option_dict['action'] == 'push':
