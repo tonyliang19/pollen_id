@@ -61,7 +61,7 @@ class Trainer(BaseTrainer):
         to_validate = False
 
         self._validate(model, dataloaders_dict['val'], criterion, device, n_classes, 0, base_lr)
-        
+
         while True:
             all_losses = []
             all_accu = []
@@ -116,6 +116,7 @@ class Trainer(BaseTrainer):
                       np.mean(all_losses),
                       str(datetime.datetime.now()))
                 self._validate(model, dataloaders_dict['val'], criterion, device, n_classes, training_round, lr)
+                return 
                 print('SNAPSHOOTING', str(datetime.datetime.now()))
                 torch.save(self._net.state_dict(), self._config['WEIGHTS'])
                 to_validate = False
