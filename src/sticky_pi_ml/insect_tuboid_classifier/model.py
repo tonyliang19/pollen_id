@@ -10,7 +10,11 @@ from torchvision.models.resnet import BasicBlock, Bottleneck, ResNet
 RESNET_VARIANTS = {
     '50': {'url': 'https://download.pytorch.org/models/resnet50-19c8e357.pth',
            'block': Bottleneck,
-           'layers': [3, 4, 6, 3]}
+           'layers': [3, 4, 6, 3]},
+
+    '152': {'url': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
+           'block': Bottleneck,
+           'layers': [3, 8, 36, 3]}
 }
 
 
@@ -82,7 +86,7 @@ class ResNetPlus(ResNet):
         return self._forward_impl(x)
 
 
-def make_resnet(pretrained: bool, n_classes, progress=True, resnet_variant: str = '50'):
+def make_resnet(pretrained: bool, n_classes, progress=True, resnet_variant: str = '152'):
     try:
         variant = RESNET_VARIANTS[resnet_variant]
     except KeyError:

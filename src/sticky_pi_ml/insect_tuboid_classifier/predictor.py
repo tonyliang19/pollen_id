@@ -33,7 +33,7 @@ class Predictor(BasePredictor):
     def _make_net(self):
         return make_resnet(pretrained=False, n_classes=self._ml_bundle.dataset.n_classes)
 
-    def predict_client(self, device, start_datetime, end_datetime):
+    def predict_client(self, device, start_datetime, end_datetime, display_prediction=False, output_dir=None):
         assert issubclass(type(self._ml_bundle), ClientMLBundle), \
             "This method only works for MLBundles linked to a client"
         client = self._ml_bundle.client
@@ -50,6 +50,7 @@ class Predictor(BasePredictor):
             return
 
         tiled_tuboids_for_series = pd.DataFrame(client_resp)
+
         # the fields from  the insect tuboid classifier are suffixed by `_itc`. not to be confused with the fields from
         # the tiled tuboids table
         if 'algo_version_itc' not in tiled_tuboids_for_series.columns:
@@ -59,12 +60,19 @@ class Predictor(BasePredictor):
             tiled_tuboids_for_series['algo_version_itc'] = None
             tiled_tuboids_for_series['algo_name_itc'] = ""
 
+        initial_n_rows = len(tiled_tuboids_for_series)
+
         # we want to label tuboids that are not labeled yet by this algorithm (name) or this version of the algo
         conditions = (self.version > tiled_tuboids_for_series.algo_version_itc) | \
                      (tiled_tuboids_for_series.algo_version_itc.isnull()) | \
                      (self.name != tiled_tuboids_for_series.algo_name_itc)
 
+
         tiled_tuboids_for_series = tiled_tuboids_for_series[conditions]
+        final_n_rows = len(tiled_tuboids_for_series)
+
+        logging.info(f'{final_n_rows} tuboids to annotate ({initial_n_rows - final_n_rows} already annotated)')
+
         tiled_tuboids_for_series = tiled_tuboids_for_series.sort_values(by=['algo_version_itc', 'start_datetime'])
         tiled_tuboids_for_series = tiled_tuboids_for_series.drop_duplicates(subset=['tuboid_id'], keep='last')
 
@@ -72,25 +80,30 @@ class Predictor(BasePredictor):
             logging.warning('No tuboids to label in %s (all labeled)' % series)
             return
 
-        all_predictions = []
-        for _, r in tiled_tuboids_for_series.iterrows():
+        def _predict_single_client_tuboid(args):
+
+            r = args[1][1]
             temp_dir = tempfile.mkdtemp()
             try:
                 tuboid_dir = os.path.join(temp_dir, r['tuboid_id'])
                 os.makedirs(tuboid_dir)
+                logging.info(f'Classifying tuboid: {args[0]}/{len(tiled_tuboids_for_series)}: {r["tuboid_id"]}')
                 for f in ['metadata', 'tuboid', 'context']:
                     if os.path.isfile(r[f]):
                         shutil.copy(r[f], tuboid_dir)
                     else:
                         filename = os.path.basename(r[f]).split('?')[0]
-                        logging.info(f'Downloading {filename}')
                         resp = requests.get(r[f]).content
                         with open(os.path.join(tuboid_dir, filename), 'wb') as file:
                             file.write(resp)
-                            print(os.path.join(tuboid_dir, filename))
 
                 tiled_tuboid = TiledTuboid(tuboid_dir)
                 prediction = self.predict(tiled_tuboid)
+                if display_prediction:
+                    self._display_prediction(prediction, tiled_tuboid)
+                if output_dir:
+                    self._make_prediction_image(prediction, tiled_tuboid,output_dir)
+
             finally:
                 shutil.rmtree(temp_dir)
 
@@ -98,16 +111,40 @@ class Predictor(BasePredictor):
             prediction['algo_name'] = self.name
             prediction['tuboid_id'] = r['tuboid_id']
             logging.info('Prediction: %s' % prediction)
+            client.put_itc_labels([prediction])
 
-            all_predictions.append(prediction)
-            if len(all_predictions) >= self._client_predict_chunk_size:
-                logging.info('Sending batch of predictions through client')
-                client.put_itc_labels(all_predictions)
-                all_predictions.clear()
+        from multiprocessing.pool import ThreadPool
+        pool = ThreadPool(4)
+        pool.map(_predict_single_client_tuboid, enumerate(tiled_tuboids_for_series.iterrows()))
 
-        if len(all_predictions) > 0:
-            logging.info('Sending last batch of predictions through client')
-            client.put_itc_labels(all_predictions)
+
+    def _make_prediction_image(self, prediction: Dict, tiled_tuboid: TiledTuboid, output_dir):
+        import cv2
+        from threading import current_thread
+        im = tiled_tuboid.get_tile(0)['array']
+        h, w, _ = im.shape
+        im = np.zeros((h + 128, w * 5, 3), np.uint8)
+        for t, i in zip(tiled_tuboid.iter_tiles(), range(0, 5)):
+            im[0:h, i * w: (i + 1) * w:] = t['array']
+        cv2.putText(im, prediction['pattern'], (24, 64 + h), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1,
+                    cv2.LINE_AA)
+        target = os.path.join(output_dir, os.path.basename(tiled_tuboid.directory) + '.jpg', )
+        os.makedirs(output_dir, exist_ok=True)
+        cv2.imwrite(target, im)
+
+    def _display_prediction(self, prediction: Dict, tiled_tuboid: TiledTuboid):
+        import cv2
+        from threading import current_thread
+        im = tiled_tuboid.get_tile(0)['array']
+        h , w, _ = im.shape
+        im = np.zeros((h + 128, w * 5, 3), np.uint8)
+        for t, i in zip(tiled_tuboid.iter_tiles(), range(0, 5)):
+            im[0:h, i * w: (i+1)*w:] = t['array']
+        cv2.putText(im, prediction['pattern'], (24, 64+h), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 1,cv2.LINE_AA)
+        cv2.imshow(current_thread().name, im)
+        cv2.waitKey(1)
+
+
 
     def predict(self, tiled_tuboid: TiledTuboid):
         data_entry = OurTorchDataset.tiled_tuboid_to_dict(tiled_tuboid, unsqueezed=True)
