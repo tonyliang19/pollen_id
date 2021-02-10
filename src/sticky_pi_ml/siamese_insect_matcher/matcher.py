@@ -31,17 +31,17 @@ class Matcher(object):
         client = self._ml_bundle.client
         logging.info('Processing series %s' % annotated_images_series)
 
-        temp_dir = tempfile.mkdtemp()
+        temp_dir = tempfile.mkdtemp(suffix=series_info.name)
         try:
             cache_image_dir = os.path.join(temp_dir, "cache_images")
             os.makedirs(cache_image_dir)
             already_present_tuboids = pd.DataFrame(client.get_tiled_tuboid_series([annotated_images_series.info_dict]))
             if 'algo_version' in already_present_tuboids.columns:
                 same_algo_tuboids = already_present_tuboids[
-                    already_present_tuboids.algo_version == self._ml_bundle.version]
+                    already_present_tuboids.algo_version_series == self._ml_bundle.version]
                 n_same_algo = len(same_algo_tuboids)
                 if n_same_algo > 0:
-                    expected_n_same_algo = same_algo_tuboids.iloc[0].n_tuboids
+                    expected_n_same_algo = same_algo_tuboids.iloc[0].n_tuboids_series
                     if expected_n_same_algo != n_same_algo:
                         logging.error(f"Upstream tuboid series partially uploaded: expected {expected_n_same_algo}, but only contains {n_same_algo}")
                         return
@@ -84,7 +84,7 @@ class Matcher(object):
             logging.info('%i tuboid detected. Merging conjoint tuboids' % len(tuboids))
             tuboids = self._merge_conjoint_tuboids(tuboids, annotated_images_series)
 
-            logging.info('%i tuboid left. Removing small tuboid' % len(tuboids))
+            logging.info('%i tuboid left. Removing small tuboids' % len(tuboids))
             tuboids = [tub for tub in tuboids if len(tub) > self._tub_min_length]
 
             logging.info('%i tuboid left. Cleaning up' % len(tuboids))

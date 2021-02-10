@@ -131,8 +131,11 @@ class Dataset(BaseDataset):
                 else:
                     self._validation_data.append(e)
 
+        logging.info(f"ITC datasets")
         self._training_data.sort(key=lambda x: x['tuboid'].md5)
+        logging.info(f"N_training : {len(self._training_data)}")
         self._validation_data.sort(key=lambda x: x['tuboid'].md5)
+        logging.info(f"N_validation : {len(self._validation_data)}")
 
     def _serialise_imgs_to_dicts(self):
         sqlite_file = os.path.join(self._data_dir, self._annotations_filename)

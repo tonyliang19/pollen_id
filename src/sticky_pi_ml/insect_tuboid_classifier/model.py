@@ -86,7 +86,7 @@ class ResNetPlus(ResNet):
         return self._forward_impl(x)
 
 
-def make_resnet(pretrained: bool, n_classes, progress=True, resnet_variant: str = '152'):
+def make_resnet(pretrained: bool, n_classes, progress=True, resnet_variant: str = '50'):
     try:
         variant = RESNET_VARIANTS[resnet_variant]
     except KeyError:
