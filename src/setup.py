@@ -11,7 +11,9 @@ setup(
              'bin/insect_tuboid_classifier.py'],
     include_package_data=True,
     zip_safe=False,
-    install_requires=['numpy',
+    install_requires=[
+                      'python-dotenv',
+                      'numpy',
                       'pandas',
                       'futures',
                       'ffmpeg-python',
@@ -23,9 +25,9 @@ setup(
                       'torch >= 1.4',
                       'shapely',
                       'torchvision',
-                      'sklearn',
-                      'sticky_pi_api'],
+                      'sklearn'],
     extras_require={
+        'client': ['sticky_pi_api'],
         'test': ['nose', 'pytest', 'pytest-cov', 'codecov', 'coverage'],
         'docs': ['mock', 'sphinx-autodoc-typehints', 'sphinx', 'sphinx_rtd_theme', 'recommonmark', 'mock']
     },

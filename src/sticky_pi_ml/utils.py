@@ -8,6 +8,9 @@ from shapely.geometry import Polygon
 import logging
 import cv2
 from typing import List, Tuple, Union, IO
+import datetime
+
+STRING_DATETIME_FORMAT = '%Y-%m-%d_%H-%M-%S'
 
 
 def md5(file: Union[IO, str], chunksize=32768):
@@ -156,4 +159,15 @@ class MLScriptParser(argparse.ArgumentParser):
         env_conf = self._get_env_conf()
         option_dict.update(env_conf)
         return option_dict
+
+
+def string_to_datetime(string):
+    return datetime.datetime.strptime(string, STRING_DATETIME_FORMAT)
+
+
+def datetime_to_string(dt):
+    if pd.isnull(dt):
+        return None
+    return datetime.datetime.strftime(dt, STRING_DATETIME_FORMAT)
+
 

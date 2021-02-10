@@ -1,5 +1,4 @@
-
-from sticky_pi_ml.ml_bundle import BaseMLBundle, BaseClientMLBundle
+from sticky_pi_ml.ml_bundle import BaseMLBundle
 from sticky_pi_ml.insect_tuboid_classifier.dataset import Dataset
 import yaml
 
@@ -17,5 +16,10 @@ class MLBundle(BaseMLBundle):
         return config
 
 
-class ClientMLBundle(MLBundle, BaseClientMLBundle):
+try:
+    from sticky_pi_ml.ml_bundle import BaseClientMLBundle
+
+    class ClientMLBundle(MLBundle, BaseClientMLBundle):
+        pass
+except ImportError:
     pass

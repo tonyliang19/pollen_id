@@ -5,7 +5,7 @@ import numpy as np
 from sticky_pi_ml.utils import pad_to_square
 from sticky_pi_ml.annotations import Annotation
 from sticky_pi_ml.image import ImageSeries
-from sticky_pi_api.utils import string_to_datetime, md5
+from sticky_pi_ml.utils import string_to_datetime, md5
 from typing import List
 
 

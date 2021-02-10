@@ -22,8 +22,7 @@ from typing import Union
 import pandas as pd
 import requests
 
-from sticky_pi_api.utils import datetime_to_string, string_to_datetime
-from sticky_pi_api.client import BaseClient
+from sticky_pi_ml.utils import datetime_to_string, string_to_datetime
 from sticky_pi_ml.annotations import Annotation, DictAnnotation
 from sticky_pi_ml.utils import md5
 
@@ -67,7 +66,10 @@ class ImageSeries(list):
                              datetime_to_string(self._start_datetime),
                              datetime_to_string(self._end_datetime))
 
-    def populate_from_client(self, client: BaseClient, cache_image_dir=None):
+    def populate_from_client(self, client, cache_image_dir=None):
+        # todo, check client is indeed a client
+        from sticky_pi_api.client import BaseClient
+        assert isinstance(client, BaseClient)
 
         client_resp = client.get_images_with_uid_annotations_series([self._info_dict],
                                                                     what_annotation='data',

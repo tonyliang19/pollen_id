@@ -1,7 +1,6 @@
 import os
 from sticky_pi_ml.dataset import BaseDataset
 from sticky_pi_ml.utils import md5
-from sticky_pi_api.client import BaseClient
 import logging
 from abc import ABC
 
@@ -118,26 +117,30 @@ class BaseMLBundle(ABC):
     def weight_file(self):
         return self._weight_file
 
-class BaseClientMLBundle(BaseMLBundle, ABC):
-    def __init__(self, root_dir: str, client: BaseClient, device: str = 'cpu', cache_dir=None):
-        super().__init__(root_dir, device, cache_dir)
-        self._client = client
+try:
+    from sticky_pi_api.client import BaseClient
+    class BaseClientMLBundle(BaseMLBundle, ABC):
+        def __init__(self, root_dir: str, client: BaseClient, device: str = 'cpu', cache_dir=None):
+            super().__init__(root_dir, device, cache_dir)
+            self._client = client
 
-    @property
-    def client(self):
-        return self._client
+        @property
+        def client(self):
+            return self._client
 
-    def sync_local_to_remote(self, what: str = 'all'):
-        assert what in {'all', 'data', 'model'}
-        # we trigger version tagging
-        try:
-            _ = self.version
-        except FileNotFoundError as e:
-            logging.warning(e)
-        self._client.put_ml_bundle_dir(self._name, self._root_dir, what)
+        def sync_local_to_remote(self, what: str = 'all'):
+            assert what in {'all', 'data', 'model'}
+            # we trigger version tagging
+            try:
+                _ = self.version
+            except FileNotFoundError as e:
+                logging.warning(e)
+            self._client.put_ml_bundle_dir(self._name, self._root_dir, what)
 
-    def sync_remote_to_local(self, what: str = 'all'):
-        assert what in {'all', 'data', 'model'}
-        self._client.get_ml_bundle_dir(self._name, self._root_dir, what)
-        self.__init__(self._root_dir, self._client, self._device, self._cache_dir)
+        def sync_remote_to_local(self, what: str = 'all'):
+            assert what in {'all', 'data', 'model'}
+            self._client.get_ml_bundle_dir(self._name, self._root_dir, what)
+            self.__init__(self._root_dir, self._client, self._device, self._cache_dir)
 
+except ImportError:
+    logging.warning('Failed to load sticky_pi_api. Will not be able to use client MLBundles')

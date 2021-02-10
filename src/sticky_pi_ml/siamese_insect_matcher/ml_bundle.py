@@ -1,5 +1,4 @@
-import os
-from sticky_pi_ml.ml_bundle import BaseMLBundle, BaseClientMLBundle
+from sticky_pi_ml.ml_bundle import BaseMLBundle
 from sticky_pi_ml.siamese_insect_matcher.dataset import Dataset
 import yaml
 
@@ -16,6 +15,10 @@ class MLBundle(BaseMLBundle):
         config['DEVICE'] = device
         return config
 
+try:
+    from sticky_pi_ml.ml_bundle import BaseClientMLBundle
 
-class ClientMLBundle(MLBundle, BaseClientMLBundle):
+    class ClientMLBundle(MLBundle, BaseClientMLBundle):
+        pass
+except ImportError:
     pass
