@@ -1,6 +1,4 @@
-"""
 
-"""
 import io
 import json
 import os
@@ -67,7 +65,6 @@ class ImageSeries(list):
                              datetime_to_string(self._end_datetime))
 
     def populate_from_client(self, client, cache_image_dir=None):
-        # todo, check client is indeed a client
         from sticky_pi_api.client import BaseClient
         assert isinstance(client, BaseClient)
 
@@ -98,9 +95,16 @@ class ImageSeries(list):
 
                     filename = os.path.basename(r['url']).split('?')[0]
                     logging.info(f'Downloading {filename}')
-                    resp = requests.get(r['url']).content
-                    with open(os.path.join(cache_image_dir, filename), 'wb') as file:
-                        file.write(resp)
+                    target = os.path.join(cache_image_dir, filename)
+                    if os.path.isfile(target):
+                        local_md5 = md5(target)
+                    else:
+                        local_md5 = None
+
+                    if r['md5'] != local_md5:
+                        resp = requests.get(r['url']).content
+                        with open(target, 'wb') as file:
+                            file.write(resp)
 
                     local_url = os.path.join(cache_image_dir, filename)
                 else:

@@ -73,6 +73,8 @@ class Dataset(BaseDataset):
             for d in td:
                 DatasetCatalog.register(d, lambda d = d: self._training_data)
                 MetadataCatalog.get(d).set(thing_classes = self._config.CLASSES)
+        logging.info(f"N_validation = {len(self._validation_data)}")
+        logging.info(f"N_train = {len(self._training_data)}")
 
     def _serialise_imgs_to_dicts(self, input_img_list: List[str]):
         out = []
