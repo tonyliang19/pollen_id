@@ -84,35 +84,41 @@ class ImageSeries(list):
         df = df.sort_values(by=['algo_version', 'datetime'])
         df = df.drop_duplicates(subset=['id'], keep='last')
         logging.info(f'{len(df)} Images matching')
-        logging.info(f'{sum([ 0 if j is None else 1 for j in df.json ])} Annotations')
+
         annotated_images = []
+        if not "json" in df.columns:
+            logging.warning('No annotations')
+            return annotated_images
+
+        logging.info(f'{sum([0 if j is None else 1 for j in df.json])} annotations')
         for _, r in df.iterrows():
-            if 'json' in r and r['json']:
-                if not os.path.isfile(r['url']):
-                    if cache_image_dir is None or not os.path.isdir(cache_image_dir):
-                        raise FileNotFoundError(f'The requested image appears to be a remote url: {r["url"]}.'
-                                                f'For this type of resource, a valid cache image directory is needed!')
+            r_dict = r.to_dict()
+            if not r_dict['json']:
+                continue
+            if not os.path.isfile(r_dict['url']):
+                if cache_image_dir is None or not os.path.isdir(cache_image_dir):
+                    raise FileNotFoundError(f'The requested image appears to be a remote url: {r["url"]}.'
+                                            f'For this type of resource, a valid cache image directory is needed!')
 
-                    filename = os.path.basename(r['url']).split('?')[0]
-                    logging.info(f'Downloading {filename}')
-                    target = os.path.join(cache_image_dir, filename)
-                    if os.path.isfile(target):
-                        local_md5 = md5(target)
-                    else:
-                        local_md5 = None
-
-                    if r['md5'] != local_md5:
-                        resp = requests.get(r['url']).content
-                        with open(target, 'wb') as file:
-                            file.write(resp)
-
-                    local_url = os.path.join(cache_image_dir, filename)
+                filename = os.path.basename(r_dict['url']).split('?')[0]
+                logging.info(f'Downloading {filename}')
+                target = os.path.join(cache_image_dir, filename)
+                if os.path.isfile(target):
+                    local_md5 = md5(target)
                 else:
-                    local_url = r['url']
+                    local_md5 = None
 
-                im = ImageJsonAnnotations(local_url, json_str=r['json'])
+                if r_dict['md5'] != local_md5:
+                    resp = requests.get(r_dict['url']).content
+                    with open(target, 'wb') as file:
+                        file.write(resp)
 
-                annotated_images.append(im)
+                local_url = os.path.join(cache_image_dir, filename)
+            else:
+                local_url = r_dict['url']
+
+            im = ImageJsonAnnotations(local_url, json_str=r_dict['json'])
+            annotated_images.append(im)
 
         self.clear()
         for im in sorted(annotated_images, key=lambda x: x.datetime):
