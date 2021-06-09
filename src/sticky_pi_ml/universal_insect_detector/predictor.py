@@ -22,6 +22,7 @@ from typing import Union
 class Predictor(BasePredictor):
 
     _detect_client_chunk_size = 64
+    _minimum_tile_overlap = 500
 
     def __init__(self, ml_bundle: Union[ClientMLBundle, MLBundle]):
         super().__init__(ml_bundle)
@@ -153,10 +154,12 @@ class Predictor(BasePredictor):
         # think about what to do when object fully overlap as they come from multiple detections
         # self intersecting contours :(
 
-        x_n_tiles = 4
+
+        x_n_tiles = math.ceil(1 + (array.shape[1] - 1024) / (1024 - self._minimum_tile_overlap))
         x_stride = (array.shape[1] - 1024) // (x_n_tiles - 1)
-        y_n_tiles = 3
+        y_n_tiles = math.ceil(1 + (array.shape[0] - 1024) / (1024 - self._minimum_tile_overlap))
         y_stride = (array.shape[0] - 1024) // (y_n_tiles - 1)
+
         offsets = []
         for n, j in enumerate(range(0, array.shape[0] - 1023, y_stride)):
             for m, i in enumerate(range(0, array.shape[1] - 1023, x_stride)):
