@@ -1,6 +1,4 @@
-"""
 
-"""
 import io
 import json
 import os
@@ -22,8 +20,7 @@ from typing import Union
 import pandas as pd
 import requests
 
-from sticky_pi_api.utils import datetime_to_string, string_to_datetime
-from sticky_pi_api.client import BaseClient
+from sticky_pi_ml.utils import datetime_to_string, string_to_datetime
 from sticky_pi_ml.annotations import Annotation, DictAnnotation
 from sticky_pi_ml.utils import md5
 
@@ -67,7 +64,9 @@ class ImageSeries(list):
                              datetime_to_string(self._start_datetime),
                              datetime_to_string(self._end_datetime))
 
-    def populate_from_client(self, client: BaseClient, cache_image_dir=None):
+    def populate_from_client(self, client, cache_image_dir=None):
+        from sticky_pi_api.client import BaseClient
+        assert isinstance(client, BaseClient)
 
         client_resp = client.get_images_with_uid_annotations_series([self._info_dict],
                                                                     what_annotation='data',
@@ -85,28 +84,41 @@ class ImageSeries(list):
         df = df.sort_values(by=['algo_version', 'datetime'])
         df = df.drop_duplicates(subset=['id'], keep='last')
         logging.info(f'{len(df)} Images matching')
-        logging.info(f'{sum([ 0 if j is None else 1 for j in df.json ])} Annotations')
-        annotated_images = []
-        for _, r in df.iterrows():
-            if 'json' in r and r['json']:
-                if not os.path.isfile(r['url']):
-                    if cache_image_dir is None or not os.path.isdir(cache_image_dir):
-                        raise FileNotFoundError(f'The requested image appears to be a remote url: {r["url"]}.'
-                                                f'For this type of resource, a valid cache image directory is needed!')
 
-                    filename = os.path.basename(r['url']).split('?')[0]
-                    logging.info(f'Downloading {filename}')
-                    resp = requests.get(r['url']).content
-                    with open(os.path.join(cache_image_dir, filename), 'wb') as file:
+        annotated_images = []
+        if not "json" in df.columns:
+            logging.warning('No annotations')
+            return annotated_images
+
+        logging.info(f'{sum([0 if j is None else 1 for j in df.json])} annotations')
+        for _, r in df.iterrows():
+            r_dict = r.to_dict()
+            if not r_dict['json']:
+                continue
+            if not os.path.isfile(r_dict['url']):
+                if cache_image_dir is None or not os.path.isdir(cache_image_dir):
+                    raise FileNotFoundError(f'The requested image appears to be a remote url: {r["url"]}.'
+                                            f'For this type of resource, a valid cache image directory is needed!')
+
+                filename = os.path.basename(r_dict['url']).split('?')[0]
+                logging.info(f'Downloading {filename}')
+                target = os.path.join(cache_image_dir, filename)
+                if os.path.isfile(target):
+                    local_md5 = md5(target)
+                else:
+                    local_md5 = None
+
+                if r_dict['md5'] != local_md5:
+                    resp = requests.get(r_dict['url']).content
+                    with open(target, 'wb') as file:
                         file.write(resp)
 
-                    local_url = os.path.join(cache_image_dir, filename)
-                else:
-                    local_url = r['url']
+                local_url = os.path.join(cache_image_dir, filename)
+            else:
+                local_url = r_dict['url']
 
-                im = ImageJsonAnnotations(local_url, json_str=r['json'])
-
-                annotated_images.append(im)
+            im = ImageJsonAnnotations(local_url, json_str=r_dict['json'])
+            annotated_images.append(im)
 
         self.clear()
         for im in sorted(annotated_images, key=lambda x: x.datetime):

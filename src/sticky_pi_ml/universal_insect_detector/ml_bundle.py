@@ -1,5 +1,5 @@
 import os
-from sticky_pi_ml.ml_bundle import BaseMLBundle, BaseClientMLBundle
+from sticky_pi_ml.ml_bundle import BaseMLBundle
 from sticky_pi_ml.universal_insect_detector.dataset import Dataset
 import yaml
 from detectron2.config import get_cfg, CfgNode
@@ -43,5 +43,10 @@ class MLBundle(BaseMLBundle):
         return config
 
 
-class ClientMLBundle(MLBundle, BaseClientMLBundle):
+try:
+    from sticky_pi_ml.ml_bundle import BaseClientMLBundle
+
+    class ClientMLBundle(MLBundle, BaseClientMLBundle):
+        pass
+except ImportError:
     pass

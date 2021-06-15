@@ -60,21 +60,25 @@ class Predictor(BasePredictor):
             tiled_tuboids_for_series['algo_version_itc'] = None
             tiled_tuboids_for_series['algo_name_itc'] = ""
 
+
         initial_n_rows = len(tiled_tuboids_for_series)
+
+        tiled_tuboids_for_series = tiled_tuboids_for_series.sort_values(by=['algo_version_itc', 'start_datetime'])
+        tiled_tuboids_for_series = tiled_tuboids_for_series.drop_duplicates(subset=['tuboid_id'], keep='last')
+
+        final_n_rows = len(tiled_tuboids_for_series)
+        logging.info(f'{final_n_rows} Unique tuboids({initial_n_rows - final_n_rows} duplicated)')
+        initial_n_rows = final_n_rows
 
         # we want to label tuboids that are not labeled yet by this algorithm (name) or this version of the algo
         conditions = (self.version > tiled_tuboids_for_series.algo_version_itc) | \
                      (tiled_tuboids_for_series.algo_version_itc.isnull()) | \
                      (self.name != tiled_tuboids_for_series.algo_name_itc)
 
-
         tiled_tuboids_for_series = tiled_tuboids_for_series[conditions]
         final_n_rows = len(tiled_tuboids_for_series)
+        logging.info(f'{final_n_rows} tuboids to annotate ({initial_n_rows - final_n_rows} already annotated with the same algorithm/version)')
 
-        logging.info(f'{final_n_rows} tuboids to annotate ({initial_n_rows - final_n_rows} already annotated)')
-
-        tiled_tuboids_for_series = tiled_tuboids_for_series.sort_values(by=['algo_version_itc', 'start_datetime'])
-        tiled_tuboids_for_series = tiled_tuboids_for_series.drop_duplicates(subset=['tuboid_id'], keep='last')
 
         if len(tiled_tuboids_for_series) == 0:
             logging.warning('No tuboids to label in %s (all labeled)' % series)
@@ -113,9 +117,12 @@ class Predictor(BasePredictor):
             logging.info('Prediction: %s' % prediction)
             client.put_itc_labels([prediction])
 
-        from multiprocessing.pool import ThreadPool
-        pool = ThreadPool(4)
-        pool.map(_predict_single_client_tuboid, enumerate(tiled_tuboids_for_series.iterrows()))
+        # from multiprocessing.pool import ThreadPool
+        # pool = ThreadPool(1)
+        # pool.map(_predict_single_client_tuboid, enumerate(tiled_tuboids_for_series.iterrows()))
+
+        for i in  enumerate(tiled_tuboids_for_series.iterrows()):
+            _predict_single_client_tuboid(i)
 
 
     def _make_prediction_image(self, prediction: Dict, tiled_tuboid: TiledTuboid, output_dir):

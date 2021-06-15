@@ -72,7 +72,7 @@ class TestImage(unittest.TestCase):
             series.populate_from_client(cli)
             self.assertEqual(len(series), 5)
             for s in series:
-                self.assertEqual(s.algo_version == pred._version)
+                self.assertTrue(s.algo_version == pred._version)
 
         finally:
             shutil.rmtree(client_temp_dir)

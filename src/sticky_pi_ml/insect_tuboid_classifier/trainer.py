@@ -128,6 +128,7 @@ class Trainer(BaseTrainer):
             all_losses = []
 
             for inputs, labels in data_loader:
+
                 for k, v in inputs.items():
                     if torch.is_tensor(v):
                         inputs[k] = inputs[k].to(device)

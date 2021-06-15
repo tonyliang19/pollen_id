@@ -34,15 +34,15 @@ class DatasetMapper(object):
 
     def __call__(self, dataset_dict):
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
-        image = utils.read_image(dataset_dict["file_name"], format=self.img_format)
+        image = detection_utils.read_image(dataset_dict["file_name"], format=self.img_format)
         image, transforms = T.apply_transform_gens(self.tfm_gens, image)
         dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32"))
         annots = [
-            utils.transform_instance_annotations(obj, transforms, image.shape[:2])
+            detection_utils.transform_instance_annotations(obj, transforms, image.shape[:2])
             for obj in dataset_dict.pop("annotations")
             if obj.get("iscrowd", 0) == 0
         ]
-        instances = utils.annotations_to_instances(annots, image.shape[:2])
+        instances = detection_utils.annotations_to_instances(annots, image.shape[:2])
         dataset_dict["instances"] = detection_utils.filter_empty_instances(instances)
         return dataset_dict
 
@@ -73,6 +73,8 @@ class Dataset(BaseDataset):
             for d in td:
                 DatasetCatalog.register(d, lambda d = d: self._training_data)
                 MetadataCatalog.get(d).set(thing_classes = self._config.CLASSES)
+        logging.info(f"N_validation = {len(self._validation_data)}")
+        logging.info(f"N_train = {len(self._training_data)}")
 
     def _serialise_imgs_to_dicts(self, input_img_list: List[str]):
         out = []
