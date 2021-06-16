@@ -2,10 +2,11 @@ import requests
 import os
 import tempfile
 import shutil
+import math
+import logging
 import cv2
 import numpy as np
 import torch
-import logging
 from shapely.geometry import Polygon
 from detectron2.engine import DefaultPredictor
 from sticky_pi_ml.predictor import BasePredictor
@@ -17,6 +18,7 @@ from sticky_pi_api.client import BaseClient
 from sticky_pi_api.types import InfoType
 import pandas as pd
 from typing import Union
+
 
 
 class Predictor(BasePredictor):
