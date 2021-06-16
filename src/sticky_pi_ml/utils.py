@@ -103,7 +103,7 @@ class MLScriptParser(argparse.ArgumentParser):
     _required_env_vars = ['BUNDLE_ROOT_DIR', 'LOCAL_CLIENT_DIR',
                           'API_HOST', 'API_USER', 'API_PASSWORD']
 
-    def __init__(self, config_file=None):
+    def option_dict__init__(self, config_file=None):
         super().__init__()
 
         self.add_argument("action", help=str(self._valid_actions))
