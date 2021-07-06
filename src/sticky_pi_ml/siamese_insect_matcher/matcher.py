@@ -31,7 +31,7 @@ class Matcher(object):
         client = self._ml_bundle.client
         logging.info('Processing series %s' % annotated_images_series)
 
-        temp_dir = tempfile.mkdtemp(suffix=series_info.name)
+        temp_dir = tempfile.mkdtemp(suffix=annotated_images_series.name)
         try:
             cache_image_dir = os.path.join(temp_dir, "cache_images")
             os.makedirs(cache_image_dir)
