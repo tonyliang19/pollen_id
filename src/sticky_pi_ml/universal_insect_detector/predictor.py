@@ -10,14 +10,27 @@ import torch
 from shapely.geometry import Polygon
 from detectron2.engine import DefaultPredictor
 from sticky_pi_ml.predictor import BasePredictor
-from sticky_pi_ml.universal_insect_detector.ml_bundle import MLBundle, ClientMLBundle
+from sticky_pi_ml.universal_insect_detector.ml_bundle import MLBundle
+
 from sticky_pi_ml.universal_insect_detector.palette import Palette
 from sticky_pi_ml.annotations import Annotation
 from sticky_pi_ml.image import Image
-from sticky_pi_api.client import BaseClient
-from sticky_pi_api.types import InfoType
+
+
 import pandas as pd
 from typing import Union
+
+try:
+    import ClientMLBundle
+    from sticky_pi_api.types import InfoType
+    Ml_bundle_type = Union[ClientMLBundle, MLBundle]
+except ImportError:
+    from typing import Any as InfoType
+    logging.warning('Failed to load sticky_pi_api. Will not be able to use client MLBundles')
+    Ml_bundle_type = MLBundle
+
+
+
 
 
 
@@ -26,7 +39,7 @@ class Predictor(BasePredictor):
     _detect_client_chunk_size = 64
     _minimum_tile_overlap = 500
 
-    def __init__(self, ml_bundle: Union[ClientMLBundle, MLBundle]):
+    def __init__(self, ml_bundle: Ml_bundle_type):
         super().__init__(ml_bundle)
         self._min_width = self._ml_bundle.config.MIN_MAX_OBJ_SIZE[0]
         self._palette = Palette({k: v for k, v in self._ml_bundle.config.CLASSES})
@@ -101,7 +114,7 @@ class Predictor(BasePredictor):
             logging.info("Sending %i annotations to client" % len(all_annots))
             client.put_uid_annotations(all_annots)
 
-    def detect(self, image, *args, **kwargs) -> Image:
+    def detect(self, image: Image, *args, **kwargs) -> Image:
         instances = self._detect_instances(image, *args, **kwargs)
         new_image = image.copy()
         new_image.set_annotations(instances)
@@ -145,7 +158,7 @@ class Predictor(BasePredictor):
         largest_contour = np.argmax([cv2.contourArea(c) for c in contours])
         return contours[largest_contour]
 
-    def _detect_instances(self, img, score_threshold=.50):
+    def _detect_instances(self, img: Image, score_threshold=.50):
         polys = []
         classes = []
         logging.debug(img)
@@ -156,18 +169,31 @@ class Predictor(BasePredictor):
         # think about what to do when object fully overlap as they come from multiple detections
         # self intersecting contours :(
 
+        if array.shape[1] <= 1024:
+            x_range = [0]
+            x_n_tiles = 1
+        else:
+            x_n_tiles = math.ceil(1 + (array.shape[1] - 1024) / (1024 - self._minimum_tile_overlap))
+            x_stride = (array.shape[1] - 1024) // (x_n_tiles - 1)
+            x_range = [r for r in range(0, array.shape[1] - 1023, x_stride)]
 
-        x_n_tiles = math.ceil(1 + (array.shape[1] - 1024) / (1024 - self._minimum_tile_overlap))
-        x_stride = (array.shape[1] - 1024) // (x_n_tiles - 1)
-        y_n_tiles = math.ceil(1 + (array.shape[0] - 1024) / (1024 - self._minimum_tile_overlap))
-        y_stride = (array.shape[0] - 1024) // (y_n_tiles - 1)
 
+        if array.shape[0] <= 1024:
+            y_range = [0]
+            y_n_tiles = 1
+
+        else:
+            y_n_tiles = math.ceil(1 + (array.shape[0] - 1024) / (1024 - self._minimum_tile_overlap))
+            y_stride = (array.shape[0] - 1024) // (y_n_tiles - 1)
+            y_range = [r for r in range(0, array.shape[0] - 1023, y_stride)]
         offsets = []
-        for n, j in enumerate(range(0, array.shape[0] - 1023, y_stride)):
-            for m, i in enumerate(range(0, array.shape[1] - 1023, x_stride)):
+        for n, j in enumerate(y_range):
+            for m, i in enumerate(x_range):
                 offsets.append(((m, n), (i, j)))
 
-        for ((m, n), o) in offsets:
+
+        for i, ((m, n), o) in enumerate(offsets):
+            logging.info(f"{img.filename}, {i}/{len(offsets)}")
             im_1 = array[o[1]: (o[1] + 1024), o[0]: (o[0] + 1024)]
             p = self._detectron_predictor(im_1)
             p_bt = p['instances'].pred_boxes.tensor

@@ -46,7 +46,6 @@ class BaseMLBundle(ABC):
             import shutil
             self._cache_dir = tempfile.mkdtemp(prefix='sticky_pi_%s_' % self._name)
             atexit.register(shutil.rmtree, self._cache_dir)
-
             os.makedirs(self._output_dir, exist_ok=True)
 
         config_file = os.path.join(self._config_dir, self._config_filename)

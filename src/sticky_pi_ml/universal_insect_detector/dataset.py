@@ -147,7 +147,7 @@ class Dataset(BaseDataset):
         new_basename = pre + '.jpg'
         new_path = os.path.join(self._cache_dir, new_basename)
         if not os.path.exists(new_path):
-            SVGImage(file).extract_jpeg(new_path)
+            SVGImage(file, foreign = True).extract_jpeg(new_path)
         return new_path
 
     def visualise(self, subset='train', augment=False):

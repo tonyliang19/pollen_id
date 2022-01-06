@@ -126,11 +126,16 @@ class ImageSeries(list):
 
 
 class Image(object):
-    def __init__(self, path: str):
+    def __init__(self, path: str, foreign: bool = False):
         self._path = path
         self._filename = os.path.basename(path)
         self._md5 = None
-        file_info = self._device_datetime_info(self._filename)
+        self._foreign = foreign
+        if not self._foreign:
+            file_info = self._device_datetime_info(self._filename)
+        else:
+            file_info = {'datetime': None, 'device':None}
+
         self._datetime = file_info['datetime']
         self._device = file_info['device']
         self._annotations = []
@@ -182,7 +187,11 @@ class Image(object):
         # we force metadata parsing if it was not
         _ = self.metadata
         self._metadata['md5'] = self.md5
-        self._metadata.update(self._device_datetime_info(self._filename))
+        if not self._foreign:
+            datetime_device_info = self._device_datetime_info(self._filename)
+        else:
+            datetime_device_info = {'datetime': None, 'device':None}
+        self._metadata.update(datetime_device_info)
         self._metadata['algo_name'] = name
         self._metadata['algo_version'] = version
 
@@ -272,9 +281,13 @@ class Image(object):
 
     def _decode_metadata(self):
         with PIL.Image.open(self._path) as img:
+            exifs = img._getexif()
+            # possibly, foreign images have no exif data!
+            if not exifs and self._foreign:
+                return {}
             out = {
                 PIL.ExifTags.TAGS[k]: v
-                for k, v in img._getexif().items()
+                for k, v in exifs.items()
                 if k in PIL.ExifTags.TAGS
             }
             # cast to float for compatibility
@@ -282,10 +295,13 @@ class Image(object):
                 if isinstance(v, PIL.TiffImagePlugin.IFDRational):
                     out[k] = float(v)
 
-        try:
-            out['Make'] = literal_eval(out['Make'])
-        except ValueError as e:
-            logging.warning('Missing custom metadata in %s, Make is `%s`' % (self._path, out['Make']))
+        if not self._foreign:
+            try:
+                out['Make'] = literal_eval(out['Make'])
+            except ValueError as e:
+                logging.warning('Missing custom metadata in %s, Make is `%s`' % (self._path, out['Make']))
+        else:
+            out['Make'] = None
         return out
 
     def _img_buffer(self):
@@ -368,8 +384,8 @@ class Image(object):
 
 
 class SVGImage(Image):
-    def __init__(self, path):
-        super().__init__(path)
+    def __init__(self, path, foreign: bool = True):
+        super().__init__(path, foreign)
         # the shape of the image within the svg document
         # will have to scale the contours  to match the actual dimensions of the embedded image
         self._scale_in_svg = None
@@ -454,9 +470,12 @@ class SVGImage(Image):
             logging.error('Cannot parse metadata is %s. String was is `%s`' % (self._path, self._metadata))
             logging.error(e)
 
-        if not isinstance(self._metadata['Make'], dict):
-            logging.warning('Missing custom metadata in %s, Make is `%s`' % (self._path, self._metadata['Make']))
-
+        if not self._foreign:
+            if not isinstance(self._metadata['Make'], dict):
+                logging.warning('Missing custom metadata in %s, Make is `%s`' % (self._path, self._metadata['Make']))
+        else:
+            self._metadata['Make'] = None
+            
     def _svg_path_to_contour(self, p, n_point_per_segment=2):
         string = p.attrib['d']
         tvals = np.linspace(0, 1, n_point_per_segment)
