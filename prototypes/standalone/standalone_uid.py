@@ -13,7 +13,7 @@ MANUAL_ANNOTATION_PREFIX = "a_"
 # functions:
 # * predict_dir -> take a dir with images (glob pattern), convert them to annoattated svg
 # * train -> train
-valid_actions = {'predict_dir', 'train'}
+valid_actions = {'predict_dir', 'train', 'check_data'}
 
 if __name__ == '__main__':
     args_parse = argparse.ArgumentParser()
@@ -35,7 +35,7 @@ if __name__ == '__main__':
     args_parse.add_argument("-f", "--force", dest="force", default=False, help="force", action="store_true")
 
     # training specific
-    args_parse.add_argument("-r", "--restart-training", dest="restart_training")
+    args_parse.add_argument("-r", "--restart-training", dest="restart_training", default=False, action="store_true")
 
 
     args = args_parse.parse_args()
@@ -101,3 +101,6 @@ if __name__ == '__main__':
         t = Trainer(bundle)
         t.resume_or_load(resume=not option_dict['restart_training'])
         t.train()
+
+    if option_dict['action'] == 'check_data':
+        bundle.dataset.prepare()

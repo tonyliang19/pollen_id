@@ -22,14 +22,14 @@ from detectron2.data import DatasetCatalog, MetadataCatalog
 
 class DatasetMapper(object):
     def __init__(self, cfg):
-        #fixme add these augmentations in config ?
-        self.tfm_gens = [   T.RandomBrightness(0.9, 1.1),
-                            T.RandomContrast(0.9, 1.1),
-                            T.RandomFlip(horizontal=True, vertical=False),
-                            T.RandomFlip(horizontal=False, vertical=True),
-                            T.RandomRotation(angle=[0, 90, 180, 270], sample_style='choice'),
-                            T.RandomCrop(crop_type='absolute', crop_size=cfg.INPUT.CROP.SIZE)
-                            ]
+        # fixme add these augmentations in config ?
+        self.tfm_gens = [T.RandomBrightness(0.9, 1.1),
+                         T.RandomContrast(0.9, 1.1),
+                         T.RandomFlip(horizontal=True, vertical=False),
+                         T.RandomFlip(horizontal=False, vertical=True),
+                         T.RandomRotation(angle=[0, 90, 180, 270], sample_style='choice'),
+                         T.RandomCrop(crop_type='absolute', crop_size=cfg.INPUT.CROP.SIZE)
+                         ]
         self.img_format = cfg.INPUT.FORMAT
 
     def __call__(self, dataset_dict):
@@ -49,7 +49,7 @@ class DatasetMapper(object):
 
 class Dataset(BaseDataset):
     def __init__(self, data_dir, config, cache_dir):
-        super().__init__(data_dir, config,  cache_dir)
+        super().__init__(data_dir, config, cache_dir)
         self._palette = None
 
     def _prepare(self):
@@ -71,14 +71,15 @@ class Dataset(BaseDataset):
         # register data
         for td in [self._config.DATASETS.TEST, self._config.DATASETS.TRAIN]:
             for d in td:
-                DatasetCatalog.register(d, lambda d = d: self._training_data)
-                MetadataCatalog.get(d).set(thing_classes = self._config.CLASSES)
+                DatasetCatalog.register(d, lambda d=d: self._training_data)
+                MetadataCatalog.get(d).set(thing_classes=self._config.CLASSES)
         logging.info(f"N_validation = {len(self._validation_data)}")
         logging.info(f"N_train = {len(self._training_data)}")
 
     def _serialise_imgs_to_dicts(self, input_img_list: List[str]):
         out = []
         for svg_file in input_img_list:
+            logging.info(f"[preparing {svg_file}")
             pre_extracted_jpg = self._create_jpg_from_svg(svg_file)
 
             with open(pre_extracted_jpg, 'rb') as im_file:
@@ -87,12 +88,12 @@ class Dataset(BaseDataset):
             h, w, _ = cv2.imread(pre_extracted_jpg).shape
 
             out += [{'file_name': pre_extracted_jpg,
-                   'height': h,
-                   'width': w,
-                   'image_id': os.path.basename(pre_extracted_jpg),
-                   'annotations': self._pickled_objs_from_svg(svg_file),
-                   "md5": md5_sum,
-                   "original_svg": svg_file
+                     'height': h,
+                     'width': w,
+                     'image_id': os.path.basename(pre_extracted_jpg),
+                     'annotations': self._pickled_objs_from_svg(svg_file),
+                     "md5": md5_sum,
+                     "original_svg": svg_file
                      }]
         return out
 
@@ -147,14 +148,14 @@ class Dataset(BaseDataset):
         new_basename = pre + '.jpg'
         new_path = os.path.join(self._cache_dir, new_basename)
         if not os.path.exists(new_path):
-            SVGImage(file, foreign = True).extract_jpeg(new_path)
+            SVGImage(file, foreign=True, skip_annotations=True).extract_jpeg(new_path)
         return new_path
 
     def visualise(self, subset='train', augment=False):
         from detectron2.utils.visualizer import Visualizer
         self.prepare()
         if subset == 'train':
-            subset =  self._config.DATASETS.TRAIN[0]
+            subset = self._config.DATASETS.TRAIN[0]
         elif subset == 'val':
             subset = self._config.DATASETS.TEST[0]
         else:

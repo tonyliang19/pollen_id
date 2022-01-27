@@ -384,13 +384,14 @@ class Image(object):
 
 
 class SVGImage(Image):
-    def __init__(self, path, foreign: bool = True):
+    def __init__(self, path, foreign: bool = True, skip_annotations=False):
         super().__init__(path, foreign)
         # the shape of the image within the svg document
         # will have to scale the contours  to match the actual dimensions of the embedded image
         self._scale_in_svg = None
         self._parse_metadata()
-        self._parse_annotations()
+        if not skip_annotations:
+            self._parse_annotations()
 
     def _parse(self, file):
 
@@ -418,7 +419,7 @@ class SVGImage(Image):
             contours = self._svg_path_to_contour(p)
             for c in contours:
                 if c is not None:
-                    a = Annotation(c, style['stroke'], parent_image=self)
+                    a = Annotation(c, style['stroke'], parent_image=self, debug_info=p.attrib)
                     self._annotations.append(a)
 
     def _parse_metadata(self):
@@ -475,7 +476,7 @@ class SVGImage(Image):
                 logging.warning('Missing custom metadata in %s, Make is `%s`' % (self._path, self._metadata['Make']))
         else:
             self._metadata['Make'] = None
-            
+
     def _svg_path_to_contour(self, p, n_point_per_segment=2):
         string = p.attrib['d']
         tvals = np.linspace(0, 1, n_point_per_segment)

@@ -7,7 +7,7 @@ import logging
 class Annotation(object):
     _fill_opacity = 0.2
 
-    def __init__(self, contour, stroke_colour, parent_image = None, fill_colour='#ff0000', name='annotation', value=0):
+    def __init__(self, contour, stroke_colour, parent_image = None, fill_colour='#ff0000', name='annotation', value=0, debug_info=None):
         self._contour = contour
         self._name = name
         self._stroke_colour = stroke_colour
@@ -24,8 +24,8 @@ class Annotation(object):
             self._center = cX + 01j * cY
         except ZeroDivisionError:
             if parent_image is not None:
-                logging.warning('Division by zero in contour moment of image %s. %s' %
-                                (parent_image.filename, str(self._contour)))
+                logging.warning('Division by zero in contour moment of image %s (%s).\n%s' %
+                                (parent_image.filename, debug_info, str(self._contour)))
             else:
                 logging.warning('Division by zero in contour moment')
 
