@@ -11,7 +11,7 @@ import logging
 
 MANUAL_ANNOTATION_PREFIX = "a_"
 # functions:
-# * predict_dir -> take a dir with images (glob pattern), convert them to annoattated svg
+# * predict_dir -> take a dir with images (glob pattern), convert them to annotated svg
 # * train -> train
 valid_actions = {'predict_dir', 'train', 'check_data'}
 
@@ -31,7 +31,9 @@ if __name__ == '__main__':
 
     # predict specific
     args_parse.add_argument("-t", "--target", dest="target")
-    args_parse.add_argument("-n", "--de-novo", dest="de_novo", default=False, help="Whether to just make empty SVGs for manual annotation.", action="store_true")
+    args_parse.add_argument("-n", "--de-novo", dest="de_novo", default=False, help="Whether to just make empty SVGs "
+                                                                                   "for manual annotation.",
+                            action="store_true")
     args_parse.add_argument("-f", "--force", dest="force", default=False, help="force", action="store_true")
 
     # training specific
@@ -80,8 +82,6 @@ if __name__ == '__main__':
             new_name_manual_annotation = os.path.join(os.path.dirname(img), MANUAL_ANNOTATION_PREFIX + os.path.splitext(os.path.basename(img))[0] + ".svg")
 
             img = Image(img, foreign=True)
-
-
 
             if (os.path.exists(new_name_manual_annotation) or os.path.exists(new_name)) and not option_dict["force"]:
                 logging.info(f"SVG output file exist: {os.path.relpath(new_name, option_dict['target'])}. Skipping. Use --force to overwrite")

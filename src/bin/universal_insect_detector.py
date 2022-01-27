@@ -24,6 +24,7 @@ def make_client(opt_dict):
 if __name__ == '__main__':
     parser = MLScriptParser()
     option_dict = parser.get_opt_dict()
+
     bundle_dir = os.path.join(option_dict['BUNDLE_ROOT_DIR'], BUNDLE_NAME)
     ml_bundle_cache = os.path.join(bundle_dir,'.cache')
     os.makedirs(ml_bundle_cache, exist_ok=True)
@@ -53,6 +54,12 @@ if __name__ == '__main__':
         t.train()
 
     elif option_dict['action'] == 'predict':
+        client = make_client(option_dict)
+        ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
+        pred = Predictor(ml_bundle)
+        pred.detect_client()
+
+    elif option_dict['action'] == 'predict-dir':
         client = make_client(option_dict)
         ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
         pred = Predictor(ml_bundle)
