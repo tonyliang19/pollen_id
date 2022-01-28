@@ -51,7 +51,7 @@ class Trainer(BaseTrainer):
             o = self._score_vs_gt(gt, im)
 
             if out_dir is not None:
-                assert os.path.isdir(out_dir), 'out_dir must vbe an existing directory'
+                assert os.path.isdir(out_dir), 'out_dir must be an existing directory'
                 target = os.path.join(out_dir, "validation_" + gt.filename)
                 logging.info('saving %s' % target)
                 new_annot = []

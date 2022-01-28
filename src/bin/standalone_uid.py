@@ -13,7 +13,7 @@ MANUAL_ANNOTATION_PREFIX = "a_"
 # functions:
 # * predict_dir -> take a dir with images (glob pattern), convert them to annotated svg
 # * train -> train
-valid_actions = {'predict_dir', 'train', 'check_data'}
+valid_actions = {'predict_dir', 'train', 'check_data', 'validate'}
 
 if __name__ == '__main__':
     args_parse = argparse.ArgumentParser()
@@ -104,3 +104,9 @@ if __name__ == '__main__':
 
     if option_dict['action'] == 'check_data':
         bundle.dataset.prepare()
+
+    elif option_dict['action'] == 'validate':
+        t = Trainer(bundle)
+        pred = Predictor(bundle)
+        os.makedirs(option_dict['target'], exist_ok=True)
+        t.validate(pred, out_dir=option_dict['target'])

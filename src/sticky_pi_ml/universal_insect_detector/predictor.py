@@ -16,26 +16,22 @@ from sticky_pi_ml.universal_insect_detector.palette import Palette
 from sticky_pi_ml.annotations import Annotation
 from sticky_pi_ml.image import Image
 
-
 import pandas as pd
 from typing import Union
 
 try:
     import ClientMLBundle
     from sticky_pi_api.types import InfoType
+
     Ml_bundle_type = Union[ClientMLBundle, MLBundle]
 except ImportError:
     from typing import Any as InfoType
+
     logging.warning('Failed to load sticky_pi_api. Will not be able to use client MLBundles')
     Ml_bundle_type = MLBundle
 
 
-
-
-
-
 class Predictor(BasePredictor):
-
     _detect_client_chunk_size = 64
     _minimum_tile_overlap = 500
 
@@ -57,13 +53,13 @@ class Predictor(BasePredictor):
                      'end_datetime': "2070-01-01_00-00-00"}]
             logging.info('No info provided. Fetching all annotations')
         while True:
-            client_resp = client.get_images_with_uid_annotations_series(info, what_image='metadata', what_annotation='metadata')
+            client_resp = client.get_images_with_uid_annotations_series(info, what_image='metadata',
+                                                                        what_annotation='metadata')
 
             if len(client_resp) == 0:
                 return
 
             df = pd.DataFrame(client_resp)
-
 
             if 'algo_name' not in df.columns:
                 logging.info('No annotations for the requested images. Fetching all!')
@@ -85,7 +81,8 @@ class Predictor(BasePredictor):
                 logging.info('All annotations uploaded!')
                 return
 
-            query = [df.iloc[i][['device', 'datetime']].to_dict() for i in range(min(len(df), self._detect_client_chunk_size))]
+            query = [df.iloc[i][['device', 'datetime']].to_dict() for i in
+                     range(min(len(df), self._detect_client_chunk_size))]
             image_data = client.get_images(info=query, what='image')
             urls = [im['url'] for im in image_data]
 
@@ -128,7 +125,7 @@ class Predictor(BasePredictor):
         contours, _ = cv2.findContours(mask.astype(np.uint8),
                                        cv2.RETR_EXTERNAL,
                                        method=cv2.CHAIN_APPROX_SIMPLE,
-                                       offset=offset)[-2:] # for cv3 cv4 compat
+                                       offset=offset)[-2:]  # for cv3 cv4 compat
 
         new_contours = []
         for c in contours:
@@ -177,7 +174,6 @@ class Predictor(BasePredictor):
             x_stride = (array.shape[1] - 1024) // (x_n_tiles - 1)
             x_range = [r for r in range(0, array.shape[1] - 1023, x_stride)]
 
-
         if array.shape[0] <= 1024:
             y_range = [0]
             y_n_tiles = 1
@@ -191,13 +187,15 @@ class Predictor(BasePredictor):
             for m, i in enumerate(x_range):
                 offsets.append(((m, n), (i, j)))
 
-
         for i, ((m, n), o) in enumerate(offsets):
             logging.info(f"{img.filename}, {i}/{len(offsets)}")
             im_1 = array[o[1]: (o[1] + 1024), o[0]: (o[0] + 1024)]
             p = self._detectron_predictor(im_1)
             p_bt = p['instances'].pred_boxes.tensor
+
+            # we remove redundant edge instances as they should overlap
             non_edge_cases = torch.ones_like(p_bt[:, 0], dtype=torch.bool)
+
             if m > 0:
                 non_edge_cases = non_edge_cases.__and__(p_bt[:, 0] > 32)
             if m < x_n_tiles - 1:
@@ -216,7 +214,8 @@ class Predictor(BasePredictor):
                 poly = self._mask_to_polygons(p['instances'].pred_masks[i, :, :], offset=o)
                 if poly is not None:
                     poly_for_one_inst.append(poly)
-                    classes_for_one_inst.append(int(p['instances'].pred_classes[i]) + 1) # as we want one-indexed classes
+                    classes_for_one_inst.append(
+                        int(p['instances'].pred_classes[i]) + 1)  # as we want one-indexed classes
             polys.append(poly_for_one_inst)
             classes.append(classes_for_one_inst)
 
@@ -224,7 +223,8 @@ class Predictor(BasePredictor):
         for i in range(len(offsets)):
             overlappers_sub = []
             for j in range(len(offsets)):
-                if i != j and abs(offsets[j][1][0] - offsets[i][1][0]) < 1024 and abs(offsets[j][1][1] - offsets[i][1][1]) < 1024:
+                if i != j and abs(offsets[j][1][0] - offsets[i][1][0]) < 1024 and abs(
+                        offsets[j][1][1] - offsets[i][1][1]) < 1024:
                     overlappers_sub.append(j)
             overlappers.append(overlappers_sub)
 
@@ -258,4 +258,3 @@ class Predictor(BasePredictor):
             a = Annotation(poly, parent_image=img, stroke_colour=stroke, name=class_name)
             annotation_list.append(a)
         return annotation_list
-
