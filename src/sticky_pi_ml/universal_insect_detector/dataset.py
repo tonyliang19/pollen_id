@@ -7,42 +7,85 @@ import glob
 import os
 import copy
 import torch
+import numpy as np
+import torch
+import torchvision
+
+import logging
+
+
+from torchvision.transforms import ColorJitter, ToTensor
+
 from detectron2.data import detection_utils
 from detectron2.data import build_detection_test_loader, build_detection_train_loader
 from detectron2.data import transforms as T
+from detectron2.data.transforms.augmentation import Augmentation
 from detectron2.structures import BoxMode
+from detectron2.data import DatasetCatalog, MetadataCatalog
+
 from sticky_pi_ml.dataset import BaseDataset
 from sticky_pi_ml.image import SVGImage
 from sticky_pi_ml.utils import md5
-
-import logging
 from sticky_pi_ml.universal_insect_detector.palette import Palette
-from detectron2.data import DatasetCatalog, MetadataCatalog
+
+
+
+class OurColorJitter(Augmentation):
+
+    def __init__(self, brightness, contrast, saturation, hue):
+        self._tv_transform = ColorJitter(brightness, contrast, saturation, hue)
+
+        super().__init__()
+        # self._init(locals())
+
+    def get_transform(self, image):
+        with torch.no_grad():
+            img = torch.from_numpy(image.transpose((2, 0, 1))).contiguous()
+            # img = torch.zeros_like(img)
+            image = self._tv_transform.forward(img)
+            image = image.numpy().transpose((1, 2, 0))
+        return T.BlendTransform(src_image=image, src_weight=1, dst_weight=0)
+
 
 
 class DatasetMapper(object):
+    _padding = 64
     def __init__(self, cfg):
         # fixme add these augmentations in config ?
-        self.tfm_gens = [T.RandomBrightness(0.9, 1.1),
-                         T.RandomContrast(0.9, 1.1),
+        self.tfm_gens = [
+                         T.RandomRotation(angle=[0, 360], sample_style='range', expand=False),
+                         T.RandomCrop(crop_type='absolute', crop_size=cfg.INPUT.CROP.SIZE),
+                         OurColorJitter(brightness=.1, contrast=.1,saturation=.1, hue=.1),
                          T.RandomFlip(horizontal=True, vertical=False),
                          T.RandomFlip(horizontal=False, vertical=True),
-                         T.RandomRotation(angle=[0, 90, 180, 270], sample_style='choice'),
-                         T.RandomCrop(crop_type='absolute', crop_size=cfg.INPUT.CROP.SIZE)
                          ]
         self.img_format = cfg.INPUT.FORMAT
 
     def __call__(self, dataset_dict):
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
         image = detection_utils.read_image(dataset_dict["file_name"], format=self.img_format)
+        image = cv2.copyMakeBorder(image, self._padding, self._padding,
+                           self._padding, self._padding, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+
         image, transforms = T.apply_transform_gens(self.tfm_gens, image)
         dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32"))
+
+
+        for obj in dataset_dict["annotations"]:
+            bbox = (obj["bbox"][0] + self._padding, obj["bbox"][1] + self._padding, obj["bbox"][2], obj["bbox"][3])
+            obj["bbox"] = bbox
+
+            obj['segmentation'] = np.add(obj['segmentation'],self._padding).tolist()
+
+
         annots = [
             detection_utils.transform_instance_annotations(obj, transforms, image.shape[:2])
             for obj in dataset_dict.pop("annotations")
             if obj.get("iscrowd", 0) == 0
         ]
+
         instances = detection_utils.annotations_to_instances(annots, image.shape[:2])
+
         dataset_dict["instances"] = detection_utils.filter_empty_instances(instances)
         return dataset_dict
 
