@@ -13,7 +13,7 @@ MANUAL_ANNOTATION_PREFIX = "a_"
 # functions:
 # * predict_dir -> take a dir with images (glob pattern), convert them to annotated svg
 # * train -> train
-valid_actions = {'predict_dir', 'train', 'check_data', 'validate'}
+valid_actions = {'predict_dir', 'train', 'check_data', 'validate', 'visualise'}
 
 if __name__ == '__main__':
     args_parse = argparse.ArgumentParser()
@@ -79,12 +79,14 @@ if __name__ == '__main__':
         for img in valid_imgs:
             # foreign image may have arbitrary filenames
             new_name = os.path.join(os.path.dirname(img), os.path.splitext(os.path.basename(img))[0] + ".svg")
-            new_name_manual_annotation = os.path.join(os.path.dirname(img), MANUAL_ANNOTATION_PREFIX + os.path.splitext(os.path.basename(img))[0] + ".svg")
+            new_name_manual_annotation = os.path.join(os.path.dirname(img), MANUAL_ANNOTATION_PREFIX +
+                                                      os.path.splitext(os.path.basename(img))[0] + ".svg")
 
             img = Image(img, foreign=True)
 
             if (os.path.exists(new_name_manual_annotation) or os.path.exists(new_name)) and not option_dict["force"]:
-                logging.info(f"SVG output file exist: {os.path.relpath(new_name, option_dict['target'])}. Skipping. Use --force to overwrite")
+                logging.info(f"SVG output file exist: {os.path.relpath(new_name, option_dict['target'])}. Skipping. "
+                             f"Use --force to overwrite")
                 continue
             if option_dict["de_novo"]:
                 annotated = img
@@ -110,3 +112,6 @@ if __name__ == '__main__':
         pred = Predictor(bundle)
         os.makedirs(option_dict['target'], exist_ok=True)
         t.validate(pred, out_dir=option_dict['target'])
+
+    elif option_dict['action'] == 'visualise':
+        bundle.dataset.visualise()
