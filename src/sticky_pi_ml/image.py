@@ -477,9 +477,10 @@ class SVGImage(Image):
         else:
             self._metadata['Make'] = None
 
-    def _svg_path_to_contour(self, p, n_point_per_segment=2):
+    def _svg_path_to_contour(self, p, n_point_per_segment=2, n_point_per_curve=8):
         string = p.attrib['d']
         tvals = np.linspace(0, 1, n_point_per_segment)
+        tvals_bezier = np.linspace(0, 1, n_point_per_curve)
         try:
             path = svgpathtools.parse_path(string)
         except IndexError:
@@ -495,8 +496,21 @@ class SVGImage(Image):
             last_end = i.end
 
         out = []
+
         for sp in sub_paths:
-            arr = np.array([s.poly()(tvals) for s in sp])
+
+            arr = []
+            for s in sp:
+                if not isinstance(s, svgpathtools.Line):
+                    lines = s.poly()(tvals_bezier)
+                    lines = np.vstack([lines[0:len(lines) - 1], lines[1:len(lines)]]).T.tolist()
+                else:
+                    lines = [s.poly()(tvals)]
+
+                arr.extend(lines)
+
+            arr = np.array(arr)
+
             starts = arr[0:len(sp) - 1, n_point_per_segment - 1]
             ends = arr[1:len(sp), 0]
 
