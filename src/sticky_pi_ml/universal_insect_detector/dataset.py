@@ -1,3 +1,4 @@
+
 import cv2
 import pickle
 import gzip
@@ -11,7 +12,11 @@ import numpy as np
 import torch
 import torchvision
 
+from multiprocessing import Pool
+from functools import partial
+
 import logging
+
 
 from torchvision.transforms import ColorJitter, ToTensor
 
@@ -26,6 +31,7 @@ from sticky_pi_ml.dataset import BaseDataset
 from sticky_pi_ml.image import SVGImage
 from sticky_pi_ml.utils import md5
 from sticky_pi_ml.universal_insect_detector.palette import Palette
+
 
 
 class OurColorJitter(Augmentation):
@@ -44,6 +50,81 @@ class OurColorJitter(Augmentation):
             image = image.numpy().transpose((1, 2, 0))
         return T.BlendTransform(src_image=image, src_weight=1, dst_weight=0)
 
+
+
+
+def _objs_from_svg(svg_path, config, palette):
+    min_size, max_size = config.MIN_MAX_OBJ_SIZE
+    svg_img = SVGImage(svg_path)
+    try:
+        out = []
+        for a in svg_img.annotations:
+            width = a.rot_rect_width()
+            if width <= min_size or width > max_size:
+                continue
+            seg = [a.contour.flatten().astype(float).tolist()]
+            try:
+                label_id = palette.get_id_annot(a)
+            except Exception as e:
+                logging.warning(svg_img.filename + str(e))
+                continue
+            obj = {
+                "bbox": a.bbox,
+                "bbox_mode": BoxMode.XYWH_ABS,
+                "segmentation": seg,
+                "category_id": label_id - 1,
+                "iscrowd": 0
+            }
+            out.append(obj)
+
+    except Exception as e:
+        logging.error("issue reading %s" % svg_img.filename)
+        raise e
+    return out
+
+def _pickled_objs_from_svg( file, cache_dir, palette, config):
+    basename = os.path.basename(file)
+    pre, ext = os.path.splitext(basename)
+    new_basename = pre + '.mask.pgz'
+    new_path = os.path.join(cache_dir, new_basename)
+
+    if os.path.exists(new_path):
+        with gzip.GzipFile(new_path, 'r') as f:
+            out = pickle.load(f)
+        return out
+
+    to_pickle = _objs_from_svg(file, config, palette)
+    with gzip.GzipFile(new_path, 'w') as f:
+        pickle.dump(to_pickle, f)
+    return _pickled_objs_from_svg(file, cache_dir, palette, config)
+
+def _create_jpg_from_svg(file, cache_dir):
+    basename = os.path.basename(file)
+    pre, ext = os.path.splitext(basename)
+    new_basename = pre + '.jpg'
+    new_path = os.path.join(cache_dir, new_basename)
+    if not os.path.exists(new_path):
+        SVGImage(file, foreign=True, skip_annotations=True).extract_jpeg(new_path)
+    return new_path
+
+def _parse_one_image(svg_file, cache_dir, palette, config):
+    pre_extracted_jpg = _create_jpg_from_svg(svg_file, cache_dir)
+
+    with open(pre_extracted_jpg, 'rb') as im_file:
+        md5_sum = md5(im_file)
+    # todo file can be a MEMORY BUFFER
+    h, w, _ = cv2.imread(pre_extracted_jpg).shape
+
+    im_dic = {'file_name': pre_extracted_jpg,
+               'height': h,
+               'width': w,
+               'image_id': os.path.basename(pre_extracted_jpg),
+               'annotations': _pickled_objs_from_svg(svg_file, cache_dir, palette, config),
+               "md5": md5_sum,
+               "original_svg": svg_file
+               }
+
+    return im_dic
 
 class DatasetMapper(object):
 
@@ -110,87 +191,23 @@ class Dataset(BaseDataset):
                 self._training_data.append(entry)
 
         # register data
-        for td in [self._config.DATASETS.TEST, self._config.DATASETS.TRAIN]:
-            for d in td:
-                DatasetCatalog.register(d, lambda d=d: self._training_data)
+        dataset_dict = {self._config.DATASETS.TEST: self._validation_data,
+                        self._config.DATASETS.TRAIN: self._training_data}
+        for k, val in dataset_dict.items():
+            for d in k:
+                logging.info(f"Registering {d}: {len(val)} images")
+                DatasetCatalog.register(d, lambda d=d: val)
                 MetadataCatalog.get(d).set(thing_classes=self._config.CLASSES)
+
         logging.info(f"N_validation = {len(self._validation_data)}")
         logging.info(f"N_train = {len(self._training_data)}")
 
     def _serialise_imgs_to_dicts(self, input_img_list: List[str]):
-        out = []
-        for svg_file in input_img_list:
-            logging.info(f"[preparing {svg_file}")
-            pre_extracted_jpg = self._create_jpg_from_svg(svg_file)
 
-            with open(pre_extracted_jpg, 'rb') as im_file:
-                md5_sum = md5(im_file)
-            # todo file can be a MEMORY BUFFER
-            h, w, _ = cv2.imread(pre_extracted_jpg).shape
+        with Pool(self._config.DATALOADER.NUM_WORKERS) as p:
+            out = [m for m in p.map(partial(_parse_one_image, cache_dir=self._cache_dir, palette=self._palette, config=self._config), input_img_list)]
 
-            out += [{'file_name': pre_extracted_jpg,
-                     'height': h,
-                     'width': w,
-                     'image_id': os.path.basename(pre_extracted_jpg),
-                     'annotations': self._pickled_objs_from_svg(svg_file),
-                     "md5": md5_sum,
-                     "original_svg": svg_file
-                     }]
         return out
-
-    def _pickled_objs_from_svg(self, file):
-        basename = os.path.basename(file)
-        pre, ext = os.path.splitext(basename)
-        new_basename = pre + '.mask.pgz'
-        new_path = os.path.join(self._cache_dir, new_basename)
-
-        if os.path.exists(new_path):
-            with gzip.GzipFile(new_path, 'r') as f:
-                out = pickle.load(f)
-            return out
-
-        to_pickle = self._objs_from_svg(file)
-        with gzip.GzipFile(new_path, 'w') as f:
-            pickle.dump(to_pickle, f)
-        return self._pickled_objs_from_svg(file)
-
-    def _objs_from_svg(self, svg_path):
-        min_size, max_size = self._config.MIN_MAX_OBJ_SIZE
-        svg_img = SVGImage(svg_path)
-        try:
-            out = []
-            for a in svg_img.annotations:
-                width = a.rot_rect_width()
-                if width <= min_size or width > max_size:
-                    continue
-                seg = [a.contour.flatten().astype(float).tolist()]
-                try:
-                    label_id = self._palette.get_id_annot(a)
-                except Exception as e:
-                    logging.warning(svg_img.filename + str(e))
-                    continue
-                obj = {
-                    "bbox": a.bbox,
-                    "bbox_mode": BoxMode.XYWH_ABS,
-                    "segmentation": seg,
-                    "category_id": label_id - 1,
-                    "iscrowd": 0
-                }
-                out.append(obj)
-
-        except Exception as e:
-            logging.error("issue reading %s" % svg_img.filename)
-            raise e
-        return out
-
-    def _create_jpg_from_svg(self, file):
-        basename = os.path.basename(file)
-        pre, ext = os.path.splitext(basename)
-        new_basename = pre + '.jpg'
-        new_path = os.path.join(self._cache_dir, new_basename)
-        if not os.path.exists(new_path):
-            SVGImage(file, foreign=True, skip_annotations=True).extract_jpeg(new_path)
-        return new_path
 
     def visualise(self, subset='train', augment=False):
         from detectron2.utils.visualizer import Visualizer
