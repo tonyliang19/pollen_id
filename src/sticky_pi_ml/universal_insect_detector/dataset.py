@@ -13,7 +13,6 @@ import torchvision
 
 import logging
 
-
 from torchvision.transforms import ColorJitter, ToTensor
 
 from detectron2.data import detection_utils
@@ -27,7 +26,6 @@ from sticky_pi_ml.dataset import BaseDataset
 from sticky_pi_ml.image import SVGImage
 from sticky_pi_ml.utils import md5
 from sticky_pi_ml.universal_insect_detector.palette import Palette
-
 
 
 class OurColorJitter(Augmentation):
@@ -47,36 +45,36 @@ class OurColorJitter(Augmentation):
         return T.BlendTransform(src_image=image, src_weight=1, dst_weight=0)
 
 
-
 class DatasetMapper(object):
-    _padding = 64
+
     def __init__(self, cfg):
         # fixme add these augmentations in config ?
         self.tfm_gens = [
-                         T.RandomRotation(angle=[0, 360], sample_style='range', expand=False),
-                         T.RandomCrop(crop_type='absolute', crop_size=cfg.INPUT.CROP.SIZE),
-                         OurColorJitter(brightness=.1, contrast=.1,saturation=.1, hue=.1),
-                         T.RandomFlip(horizontal=True, vertical=False),
-                         T.RandomFlip(horizontal=False, vertical=True),
-                         ]
+            T.RandomRotation(angle=[0, 360], sample_style='range', expand=False),
+            T.RandomCrop(crop_type='absolute', crop_size=cfg.INPUT.CROP.SIZE),
+            OurColorJitter(brightness=.1, contrast=.1, saturation=.1, hue=.1),
+            T.RandomFlip(horizontal=True, vertical=False),
+            T.RandomFlip(horizontal=False, vertical=True),
+        ]
+        self._padding = cfg.ORIGINAL_IMAGE_PADDING
         self.img_format = cfg.INPUT.FORMAT
 
     def __call__(self, dataset_dict):
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
         image = detection_utils.read_image(dataset_dict["file_name"], format=self.img_format)
+
+        # we padd the image to make a sementic difference between real edges and stitching edges
         image = cv2.copyMakeBorder(image, self._padding, self._padding,
-                           self._padding, self._padding, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+                                   self._padding, self._padding, cv2.BORDER_CONSTANT, value=(0, 0, 0))
 
         image, transforms = T.apply_transform_gens(self.tfm_gens, image)
         dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32"))
-
 
         for obj in dataset_dict["annotations"]:
             bbox = (obj["bbox"][0] + self._padding, obj["bbox"][1] + self._padding, obj["bbox"][2], obj["bbox"][3])
             obj["bbox"] = bbox
 
-            obj['segmentation'] = np.add(obj['segmentation'],self._padding).tolist()
-
+            obj['segmentation'] = np.add(obj['segmentation'], self._padding).tolist()
 
         annots = [
             detection_utils.transform_instance_annotations(obj, transforms, image.shape[:2])
