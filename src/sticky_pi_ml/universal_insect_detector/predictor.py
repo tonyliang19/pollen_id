@@ -112,6 +112,7 @@ class Predictor(BasePredictor):
             client.put_uid_annotations(all_annots)
 
     def detect(self, image: Image, *args, **kwargs) -> Image:
+
         instances = self._detect_instances(image, *args, **kwargs)
         new_image = image.copy()
         new_image.set_annotations(instances)
@@ -159,9 +160,16 @@ class Predictor(BasePredictor):
         polys = []
         classes = []
         logging.debug(img)
-        array = img.read()
 
-        # todo exclude object based on size
+        array = cv2.copyMakeBorder(img.read(),
+                                   self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
+                                   self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
+                                   self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
+                                   self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
+                                   cv2.BORDER_CONSTANT, value=(0, 0, 0))
+        # array = img.read()
+
+        # todo
         # make exception to removing edge objects on the edge of the actual image
         # think about what to do when object fully overlap as they come from multiple detections
         # self intersecting contours :(
@@ -193,6 +201,18 @@ class Predictor(BasePredictor):
             p = self._detectron_predictor(im_1)
             p_bt = p['instances'].pred_boxes.tensor
 
+            big_enough = torch.zeros_like(p_bt[:, 0], dtype=torch.bool)
+            big_enough = big_enough.__or__(p_bt[:, 2] - p_bt[:, 0] > self._ml_bundle.config.MIN_MAX_OBJ_SIZE[0])
+            big_enough = big_enough.__or__(p_bt[:, 3] - p_bt[:, 1] > self._ml_bundle.config.MIN_MAX_OBJ_SIZE[0])
+
+            # print("Keeping, removing")
+            # print(sum(big_enough), len(big_enough))
+            # p['instances'] = p['instances'][big_enough]
+            # print(len(p['instances']))
+
+            # p_bt = p['instances'].pred_boxes.tensor
+
+            # p['instances'] = p['instances'][]
             # we remove redundant edge instances as they should overlap
             non_edge_cases = torch.ones_like(p_bt[:, 0], dtype=torch.bool)
 
@@ -206,12 +226,18 @@ class Predictor(BasePredictor):
             if n < y_n_tiles - 1:
                 non_edge_cases = non_edge_cases.__and__(p_bt[:, 3] < 1024 - 32)
 
-            p['instances'] = p['instances'][non_edge_cases]
+            print(p['instances'])
+            p['instances'] = p['instances'][non_edge_cases.__and__(big_enough)]
             p['instances'] = p['instances'][p['instances'].scores > score_threshold]
             classes_for_one_inst = []
             poly_for_one_inst = []
+
             for i in range(len(p['instances'])):
-                poly = self._mask_to_polygons(p['instances'].pred_masks[i, :, :], offset=o)
+                instance_offset = (o[0] - self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
+                                   o[1] - self._ml_bundle.config.ORIGINAL_IMAGE_PADDING)
+
+                poly = self._mask_to_polygons(p['instances'].pred_masks[i, :, :],
+                                              offset=instance_offset)
                 if poly is not None:
                     poly_for_one_inst.append(poly)
                     classes_for_one_inst.append(
