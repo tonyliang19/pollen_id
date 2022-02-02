@@ -11,7 +11,7 @@ import copy
 import numpy as np
 import torch
 
-
+from PIL import Image
 from multiprocessing import Pool
 from functools import partial
 
@@ -125,10 +125,12 @@ class OurColorJitter(Augmentation):
 
     def get_transform(self, image):
         with torch.no_grad():
-            img = torch.from_numpy(image.transpose((2, 0, 1))).contiguous()
+            # img = torch.from_numpy(image.transpose((2, 0, 1))).contiguous()
             # img = torch.zeros_like(img)
+            img = Image.fromarray(np.uint8(image))
             image = self._tv_transform(img)
-            image = image.numpy().transpose((1, 2, 0))
+            image = np.array(image)
+            # image = image.numpy().transpose((1, 2, 0))
         return T.BlendTransform(src_image=image, src_weight=1, dst_weight=0)
 
 
