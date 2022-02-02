@@ -27,8 +27,18 @@ from detectron2.data import transforms as T
 # https://github.com/facebookresearch/detectron2/releases/tag/v0.2
 try:
     from detectron2.data.transforms.augmentation import Augmentation
+    # from detectron2.data.transforms import CropTransform
 except ImportError:
     from detectron2.data.transforms.transform_gen import TransformGen as Augmentation
+
+
+    class CropTransform(Augmentation):
+        def __init__(self, x0: int, y0: int, w: int, h: int):
+            super().__init__()
+            self._init(locals())
+
+        def get_transform(self, img):
+            return T.CropTransform(self.x0, self.y0, self.w, self.h)
 
 from detectron2.structures import BoxMode
 from detectron2.data import DatasetCatalog, MetadataCatalog
@@ -147,13 +157,10 @@ class DatasetMapper(object):
             T.RandomFlip(horizontal=False, vertical=True),
         ]
 
-
         self._padding = cfg.ORIGINAL_IMAGE_PADDING
         self.img_format = cfg.INPUT.FORMAT
 
-
     def __call__(self, dataset_dict):
-
 
         # we padd the image to make a sementic difference between real edges and stitching edges
         if not self._augment:
@@ -202,10 +209,10 @@ class DatasetMapper(object):
 
         out = []
 
-        for i,j in itertools.product(range(n_img_rows), range(n_img_columns)):
+        for i, j in itertools.product(range(n_img_rows), range(n_img_columns)):
             # sub_image = image[i * INPUT_SIZE: (i+1) * INPUT_SIZE, j * INPUT_SIZE: (j+1) * INPUT_SIZE, :]
             local_dataset_dict = copy.deepcopy(dataset_dict)
-            tr = [T.CropTransform(j * INPUT_SIZE, i * INPUT_SIZE, INPUT_SIZE, INPUT_SIZE)]
+            tr = [CropTransform(j * INPUT_SIZE, i * INPUT_SIZE, INPUT_SIZE, INPUT_SIZE)]
             sub_image, transforms = T.apply_transform_gens(tr, image)
             local_dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32"))
 
@@ -228,6 +235,7 @@ class DatasetMapper(object):
             out.append(local_dataset_dict)
         return out
 
+
 class Dataset(BaseDataset):
     def __init__(self, data_dir, config, cache_dir):
         super().__init__(data_dir, config, cache_dir)
@@ -249,18 +257,16 @@ class Dataset(BaseDataset):
             else:
                 self._training_data.append(entry)
 
-
-        DatasetCatalog.register(self._config.DATASETS.TRAIN[0], lambda : self._training_data)
+        DatasetCatalog.register(self._config.DATASETS.TRAIN[0], lambda: self._training_data)
         MetadataCatalog.get(self._config.DATASETS.TRAIN[0]).set(thing_classes=self._config.CLASSES)
 
-        DatasetCatalog.register(self._config.DATASETS.TEST[0], lambda : self._validation_data)
+        DatasetCatalog.register(self._config.DATASETS.TEST[0], lambda: self._validation_data)
         MetadataCatalog.get(self._config.DATASETS.TEST[0]).set(thing_classes=self._config.CLASSES)
 
-        logging.info(f"N_train = {len(self._training_data)}: {[i['file_name'] for i in DatasetCatalog.get(self._config.DATASETS.TEST[0])]}")
-        logging.info(f"N_validation = {len(self._validation_data)}: {[i['file_name'] for i in DatasetCatalog.get(self._config.DATASETS.TRAIN[0])]}")
-
-
-
+        logging.info(
+            f"N_train = {len(self._training_data)}: {[i['file_name'] for i in DatasetCatalog.get(self._config.DATASETS.TEST[0])]}")
+        logging.info(
+            f"N_validation = {len(self._validation_data)}: {[i['file_name'] for i in DatasetCatalog.get(self._config.DATASETS.TRAIN[0])]}")
 
     def _serialise_imgs_to_dicts(self, input_img_list: List[str]):
 
