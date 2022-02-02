@@ -22,7 +22,14 @@ from torchvision.transforms import ColorJitter, ToTensor
 from detectron2.data import detection_utils
 from detectron2.data import build_detection_test_loader, build_detection_train_loader
 from detectron2.data import transforms as T
-from detectron2.data.transforms.augmentation import Augmentation
+
+# renaming in v0.2
+# https://github.com/facebookresearch/detectron2/releases/tag/v0.2
+try:
+    from detectron2.data.transforms.augmentation import Augmentation
+except ImportError:
+    from detectron2.data.transforms.transform_gen import TransformGen as Augmentation
+
 from detectron2.structures import BoxMode
 from detectron2.data import DatasetCatalog, MetadataCatalog
 from sticky_pi_ml.dataset import BaseDataset
@@ -188,13 +195,8 @@ class DatasetMapper(object):
         x_padding = math.ceil((INPUT_SIZE - (h % INPUT_SIZE)) / 2)
         x_padding_2 = math.floor((INPUT_SIZE - (h % INPUT_SIZE)) / 2)
 
-        # print("h, w, x_padding, y_padding")
-        # print(h, w, x_padding, y_padding)
-
         image = cv2.copyMakeBorder(image, x_padding, x_padding_2,
                                    y_padding, y_padding_2, cv2.BORDER_CONSTANT, value=(0, 0, 0))
-
-
 
         out = []
 
