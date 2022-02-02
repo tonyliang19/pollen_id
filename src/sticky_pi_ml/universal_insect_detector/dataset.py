@@ -27,10 +27,9 @@ from detectron2.data import transforms as T
 # https://github.com/facebookresearch/detectron2/releases/tag/v0.2
 try:
     from detectron2.data.transforms.augmentation import Augmentation
-    # from detectron2.data.transforms import CropTransform
+    from detectron2.data.transforms import CropTransform
 except ImportError:
     from detectron2.data.transforms.transform_gen import TransformGen as Augmentation
-
 
     class CropTransform(Augmentation):
         def __init__(self, x0: int, y0: int, w: int, h: int):
@@ -162,10 +161,10 @@ class DatasetMapper(object):
 
     def __call__(self, dataset_dict):
 
+        dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
         # we padd the image to make a sementic difference between real edges and stitching edges
         if not self._augment:
             return self._validation_crops(dataset_dict)
-        dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
 
         image = detection_utils.read_image(dataset_dict["file_name"], format=self.img_format)
         image = cv2.copyMakeBorder(image, self._padding, self._padding,
@@ -194,52 +193,78 @@ class DatasetMapper(object):
 
     def _validation_crops(self, dataset_dict):
         image = detection_utils.read_image(dataset_dict["file_name"], format=self.img_format)
-        INPUT_SIZE = 1024
-        h, w, _ = image.shape
-        n_img_columns = 1 + (w // INPUT_SIZE)
-        y_padding = math.ceil((INPUT_SIZE - (w % INPUT_SIZE)) / 2)
-        y_padding_2 = math.floor((INPUT_SIZE - (w % INPUT_SIZE)) / 2)
+        # INPUT_SIZE = 1024
+        # h, w, _ = image.shape
+        # n_img_columns = 1 + (w // INPUT_SIZE)
+        # y_padding = math.ceil((INPUT_SIZE - (w % INPUT_SIZE)) / 2)
+        # y_padding_2 = math.floor((INPUT_SIZE - (w % INPUT_SIZE)) / 2)
+        #
+        # n_img_rows = 1 + (h // INPUT_SIZE)
+        # x_padding = math.ceil((INPUT_SIZE - (h % INPUT_SIZE)) / 2)
+        # x_padding_2 = math.floor((INPUT_SIZE - (h % INPUT_SIZE)) / 2)
 
-        n_img_rows = 1 + (h // INPUT_SIZE)
-        x_padding = math.ceil((INPUT_SIZE - (h % INPUT_SIZE)) / 2)
-        x_padding_2 = math.floor((INPUT_SIZE - (h % INPUT_SIZE)) / 2)
+        image = cv2.copyMakeBorder(src=image, borderType=cv2.BORDER_CONSTANT, value=(0, 0, 0), **dataset_dict["padding"])
 
-        image = cv2.copyMakeBorder(image, x_padding, x_padding_2,
-                                   y_padding, y_padding_2, cv2.BORDER_CONSTANT, value=(0, 0, 0))
 
-        out = []
+        #
+        # for i, j in itertools.product(range(n_img_rows), range(n_img_columns)):
+        #     # sub_image = image[i * INPUT_SIZE: (i+1) * INPUT_SIZE, j * INPUT_SIZE: (j+1) * INPUT_SIZE, :]
+        #     local_dataset_dict = copy.deepcopy(dataset_dict)
+        tr = [CropTransform(**dataset_dict["cropping"])]
+        sub_image, transforms = T.apply_transform_gens(tr, image)
+        dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32")).contiguous()
 
-        for i, j in itertools.product(range(n_img_rows), range(n_img_columns)):
-            # sub_image = image[i * INPUT_SIZE: (i+1) * INPUT_SIZE, j * INPUT_SIZE: (j+1) * INPUT_SIZE, :]
-            local_dataset_dict = copy.deepcopy(dataset_dict)
-            tr = [CropTransform(j * INPUT_SIZE, i * INPUT_SIZE, INPUT_SIZE, INPUT_SIZE)]
-            sub_image, transforms = T.apply_transform_gens(tr, image)
-            local_dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32"))
+        for obj in dataset_dict["annotations"]:
+            bbox = (obj["bbox"][0] + self._padding, obj["bbox"][1] + self._padding, obj["bbox"][2], obj["bbox"][3])
+            obj["bbox"] = bbox
 
-            for obj in local_dataset_dict["annotations"]:
-                bbox = (obj["bbox"][0] + self._padding, obj["bbox"][1] + self._padding, obj["bbox"][2], obj["bbox"][3])
-                obj["bbox"] = bbox
+            obj['segmentation'] = np.add(obj['segmentation'], self._padding).tolist()
 
-                obj['segmentation'] = np.add(obj['segmentation'], self._padding).tolist()
+        annots = [
+            detection_utils.transform_instance_annotations(obj, transforms, image.shape[:2])
+            for obj in dataset_dict.pop("annotations")
+            if obj.get("iscrowd", 0) == 0
+        ]
 
-            annots = [
-                detection_utils.transform_instance_annotations(obj, transforms, image.shape[:2])
-                for obj in local_dataset_dict.pop("annotations")
-                if obj.get("iscrowd", 0) == 0
-            ]
+        instances = detection_utils.annotations_to_instances(annots, image.shape[:2])
+        dataset_dict["instances"] = detection_utils.filter_empty_instances(instances)
 
-            instances = detection_utils.annotations_to_instances(annots, image.shape[:2])
-
-            detection_utils.filter_empty_instances(instances)
-            local_dataset_dict["instances"] = detection_utils.filter_empty_instances(instances)
-            out.append(local_dataset_dict)
-        return out
+        return dataset_dict
 
 
 class Dataset(BaseDataset):
     def __init__(self, data_dir, config, cache_dir):
         super().__init__(data_dir, config, cache_dir)
         self._palette = None
+
+    def _validation_sub_image(self, entry):
+        assert self._config.INPUT.CROP.SIZE[0] == self._config.INPUT.CROP.SIZE[1]
+        INPUT_SIZE  = self._config.INPUT.CROP.SIZE[0]
+        h, w = entry["height"], entry["width"]
+        n_img_columns = 1 + (w // INPUT_SIZE)
+        n_img_rows = 1 + (h // INPUT_SIZE)
+
+        y_padding = math.ceil((INPUT_SIZE - (w % INPUT_SIZE)) / 2)
+        y_padding_2 = math.floor((INPUT_SIZE - (w % INPUT_SIZE)) / 2)
+
+        x_padding = math.ceil((INPUT_SIZE - (h % INPUT_SIZE)) / 2)
+        x_padding_2 = math.floor((INPUT_SIZE - (h % INPUT_SIZE)) / 2)
+
+
+        for i, j in itertools.product(range(n_img_rows), range(n_img_columns)):
+            e = copy.deepcopy(entry)
+            #fixme, could remove empty instances here
+            e["cropping"] = {"x0": j * INPUT_SIZE,
+                            "y0":i * INPUT_SIZE,
+                            "w": INPUT_SIZE,
+                            "h": INPUT_SIZE}
+
+            e["padding"] = {"top": x_padding,
+                             "bottom": x_padding_2,
+                             "left": y_padding,
+                             "right": y_padding_2}
+            yield e
+
 
     def _prepare(self):
         self._palette = Palette({k: v for k, v in self._config.CLASSES})
@@ -253,7 +278,10 @@ class Dataset(BaseDataset):
         while len(data) > 0:
             entry = data.pop()
             if entry['md5'] > self._md5_max_training:
-                self._validation_data.append(entry)
+                # todo, here, duplicate entry with a img_roi field, so we can pass
+                # all sub images to the mapper
+                for e in self._validation_sub_image(entry):
+                    self._validation_data.append(e)
             else:
                 self._training_data.append(entry)
 

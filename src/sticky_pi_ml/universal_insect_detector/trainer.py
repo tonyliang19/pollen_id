@@ -48,26 +48,23 @@ class ValLossHook(HookBase):
         """
             After each step calculates the validation loss and adds it to the train storage
         """
-        if self._last_validation_output is None or ( self.trainer.iter +1) % self.cfg.TEST_PERIOD == 0:
+        if self._last_validation_output is None or ( self.trainer.iter + 1) % self.cfg.TEST_PERIOD == 0:
 
             loader = self.trainer.build_test_loader(self.cfg, self._dataset_name)
 
             with torch.no_grad():
                 all_losses = []
-                for data in loader:
-                    for d in data:
+                for d in loader:
 
+                    loss_dict = self.trainer.model(d)
 
-                        #fixme do it by batch? it seems like this does it all in one go?!
-                        loss_dict = self.trainer.model(d)
+                    losses = sum(loss_dict.values())
+                    assert torch.isfinite(losses).all(), loss_dict
 
-                        losses = sum(loss_dict.values())
-                        assert torch.isfinite(losses).all(), loss_dict
-
-                        loss_dict_reduced = {"val_" + k: v.item() for k, v in comm.reduce_dict(loss_dict).items()}
-                        total_loss = sum(loss for loss in loss_dict_reduced.values())
-                        loss_dict_reduced["val_total_loss"] = total_loss
-                        all_losses.append(loss_dict_reduced)
+                    loss_dict_reduced = {"val_" + k: v.item() for k, v in comm.reduce_dict(loss_dict).items()}
+                    total_loss = sum(loss for loss in loss_dict_reduced.values())
+                    loss_dict_reduced["val_total_loss"] = total_loss
+                    all_losses.append(loss_dict_reduced)
 
                 out = None
                 for d in all_losses:
