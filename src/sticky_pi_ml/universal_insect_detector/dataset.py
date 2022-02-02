@@ -127,7 +127,7 @@ class OurColorJitter(Augmentation):
         with torch.no_grad():
             img = torch.from_numpy(image.transpose((2, 0, 1))).contiguous()
             # img = torch.zeros_like(img)
-            image = self._tv_transform.forward(img)
+            image = self._tv_transform(img)
             image = image.numpy().transpose((1, 2, 0))
         return T.BlendTransform(src_image=image, src_weight=1, dst_weight=0)
 
