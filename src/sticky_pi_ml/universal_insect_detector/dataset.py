@@ -160,7 +160,7 @@ class DatasetMapper(object):
         self.img_format = cfg.INPUT.FORMAT
 
     def __call__(self, dataset_dict):
-
+        print(dataset_dict["file_name"])
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
         # we padd the image to make a sementic difference between real edges and stitching edges
         if not self._augment:
@@ -193,23 +193,9 @@ class DatasetMapper(object):
 
     def _validation_crops(self, dataset_dict):
         image = detection_utils.read_image(dataset_dict["file_name"], format=self.img_format)
-        # INPUT_SIZE = 1024
-        # h, w, _ = image.shape
-        # n_img_columns = 1 + (w // INPUT_SIZE)
-        # y_padding = math.ceil((INPUT_SIZE - (w % INPUT_SIZE)) / 2)
-        # y_padding_2 = math.floor((INPUT_SIZE - (w % INPUT_SIZE)) / 2)
-        #
-        # n_img_rows = 1 + (h // INPUT_SIZE)
-        # x_padding = math.ceil((INPUT_SIZE - (h % INPUT_SIZE)) / 2)
-        # x_padding_2 = math.floor((INPUT_SIZE - (h % INPUT_SIZE)) / 2)
-
         image = cv2.copyMakeBorder(src=image, borderType=cv2.BORDER_CONSTANT, value=(0, 0, 0), **dataset_dict["padding"])
 
 
-        #
-        # for i, j in itertools.product(range(n_img_rows), range(n_img_columns)):
-        #     # sub_image = image[i * INPUT_SIZE: (i+1) * INPUT_SIZE, j * INPUT_SIZE: (j+1) * INPUT_SIZE, :]
-        #     local_dataset_dict = copy.deepcopy(dataset_dict)
         tr = [CropTransform(**dataset_dict["cropping"])]
         sub_image, transforms = T.apply_transform_gens(tr, image)
         dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32")).contiguous()
@@ -292,9 +278,9 @@ class Dataset(BaseDataset):
         MetadataCatalog.get(self._config.DATASETS.TEST[0]).set(thing_classes=self._config.CLASSES)
 
         logging.info(
-            f"N_train = {len(self._training_data)}: {[i['file_name'] for i in DatasetCatalog.get(self._config.DATASETS.TEST[0])]}")
+            f"N_train = {len(self._training_data)}")
         logging.info(
-            f"N_validation = {len(self._validation_data)}: {[i['file_name'] for i in DatasetCatalog.get(self._config.DATASETS.TRAIN[0])]}")
+            f"N_validation = {len(self._validation_data)}")
 
     def _serialise_imgs_to_dicts(self, input_img_list: List[str]):
 
