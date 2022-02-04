@@ -172,23 +172,25 @@ class DatasetMapper(object):
         image = cv2.copyMakeBorder(image, self._padding, self._padding,
                                    self._padding, self._padding, cv2.BORDER_CONSTANT, value=(0, 0, 0))
 
-        image, transforms = T.apply_transform_gens(self.tfm_gens, image)
-        dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32"))
-
         for obj in dataset_dict["annotations"]:
             bbox = (obj["bbox"][0] + self._padding, obj["bbox"][1] + self._padding, obj["bbox"][2], obj["bbox"][3])
             obj["bbox"] = bbox
-
             obj['segmentation'] = np.add(obj['segmentation'], self._padding).tolist()
+
+
+        image, transforms = T.apply_transform_gens(self.tfm_gens, image)
+        dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32"))
 
         annots = []
         for obj in dataset_dict.pop("annotations"):
             if obj.get("iscrowd", 0) == 0:
                 try:
-                    ann  = detection_utils.transform_instance_annotations(obj, transforms, image.shape[:2])
+                    source_obj = copy.deepcopy(obj)
+                    ann = detection_utils.transform_instance_annotations(obj, transforms, image.shape[:2])
                     annots.append(ann)
+
                 except Exception as e:
-                    logging.error(f"Annotation error in {dataset_dict['file_name']}: {obj}")
+                    logging.error(f"Annotation error in {dataset_dict['file_name']}: {source_obj}")
                     logging.error(e)
 
 
