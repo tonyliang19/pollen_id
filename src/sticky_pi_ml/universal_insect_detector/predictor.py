@@ -226,7 +226,7 @@ class Predictor(BasePredictor):
             if n < y_n_tiles - 1:
                 non_edge_cases = non_edge_cases.__and__(p_bt[:, 3] < 1024 - 32)
 
-            print(p['instances'])
+            
             p['instances'] = p['instances'][non_edge_cases.__and__(big_enough)]
             p['instances'] = p['instances'][p['instances'].scores > score_threshold]
             classes_for_one_inst = []

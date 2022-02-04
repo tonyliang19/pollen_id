@@ -160,11 +160,13 @@ class DatasetMapper(object):
         self.img_format = cfg.INPUT.FORMAT
 
     def __call__(self, dataset_dict):
-        print(dataset_dict["file_name"])
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
         # we padd the image to make a sementic difference between real edges and stitching edges
         if not self._augment:
+
             return self._validation_crops(dataset_dict)
+
+
 
         image = detection_utils.read_image(dataset_dict["file_name"], format=self.img_format)
         image = cv2.copyMakeBorder(image, self._padding, self._padding,
@@ -179,11 +181,18 @@ class DatasetMapper(object):
 
             obj['segmentation'] = np.add(obj['segmentation'], self._padding).tolist()
 
-        annots = [
-            detection_utils.transform_instance_annotations(obj, transforms, image.shape[:2])
-            for obj in dataset_dict.pop("annotations")
-            if obj.get("iscrowd", 0) == 0
-        ]
+        annots = []
+        for obj in dataset_dict.pop("annotations"):
+            if obj.get("iscrowd", 0) == 0:
+                try:
+                    ann  = detection_utils.transform_instance_annotations(obj, transforms, image.shape[:2])
+                    annots.append(ann)
+                except Exception as e:
+                    logging.error(f"Annotation error in {dataset_dict['file_name']}: {obj}")
+                    logging.error(e)
+
+
+
 
         instances = detection_utils.annotations_to_instances(annots, image.shape[:2])
 
