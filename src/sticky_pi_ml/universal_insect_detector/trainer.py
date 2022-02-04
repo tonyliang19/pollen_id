@@ -55,9 +55,7 @@ class ValLossHook(HookBase):
             with torch.no_grad():
                 all_losses = []
                 for d in loader:
-
                     loss_dict = self.trainer.model(d)
-
                     losses = sum(loss_dict.values())
                     assert torch.isfinite(losses).all(), loss_dict
 

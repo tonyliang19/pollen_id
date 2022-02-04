@@ -207,16 +207,22 @@ class DatasetMapper(object):
         image = cv2.copyMakeBorder(src=image, borderType=cv2.BORDER_CONSTANT, value=(0, 0, 0), **dataset_dict["padding"])
 
 
+        y_pad = dataset_dict["padding"]["top"]
+        x_pad = dataset_dict["padding"]["left"]
         tr = [CropTransform(**dataset_dict["cropping"])]
-        sub_image, transforms = T.apply_transform_gens(tr, image)
-        dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32")).contiguous()
 
         for obj in dataset_dict["annotations"]:
-            bbox = (obj["bbox"][0] + self._padding, obj["bbox"][1] + self._padding, obj["bbox"][2], obj["bbox"][3])
+            bbox = (obj["bbox"][0] + x_pad, obj["bbox"][1] + y_pad, obj["bbox"][2], obj["bbox"][3])
             obj["bbox"] = bbox
 
-            obj['segmentation'] = np.add(obj['segmentation'], self._padding).tolist()
+            a = np.array(obj['segmentation'])
+            a[0, 0::2] +=  x_pad
+            a[0, 1::2] +=  y_pad
+            obj['segmentation'] = a.tolist()
 
+        image, transforms = T.apply_transform_gens(tr, image)
+
+        dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32")).contiguous()
         annots = [
             detection_utils.transform_instance_annotations(obj, transforms, image.shape[:2])
             for obj in dataset_dict.pop("annotations")
@@ -307,12 +313,15 @@ class Dataset(BaseDataset):
         self.prepare()
         if subset == 'train':
             subset = self._config.DATASETS.TRAIN[0]
+            tl = build_detection_train_loader(self._config, mapper=DatasetMapper(self._config))
         elif subset == 'val':
             subset = self._config.DATASETS.TEST[0]
+            tl = build_detection_test_loader(self._config, self._config.DATASETS.TEST[0],
+                                             mapper=DatasetMapper(self._config, augment=False))
         else:
             raise ValueError('Unexpected subset. must be train or val')
 
-        tl = build_detection_train_loader(self._config, mapper=DatasetMapper(self._config))
+
         metadata = MetadataCatalog.get(subset)
         scale = 1
         for batch in tl:
