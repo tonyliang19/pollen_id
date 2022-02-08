@@ -49,12 +49,14 @@ from sticky_pi_ml.universal_insect_detector.palette import Palette
 
 def _objs_from_svg(svg_path, config, palette):
     min_size, max_size = config.MIN_MAX_OBJ_SIZE
-    svg_img = SVGImage(svg_path)
+    svg_img = SVGImage(svg_path, foreign=True)
+    excluded = 0
     try:
         out = []
         for a in svg_img.annotations:
             width = a.rot_rect_width()
             if width <= min_size or width > max_size:
+                excluded += 1
                 continue
             seg = [a.contour.flatten().astype(float).tolist()]
             try:
@@ -74,6 +76,8 @@ def _objs_from_svg(svg_path, config, palette):
     except Exception as e:
         logging.error("issue reading %s" % svg_img.filename)
         raise e
+    if excluded:
+        logging.info(f"Excluded {excluded} contours in {svg_img.filename} due to size")
     return out
 
 
@@ -163,10 +167,7 @@ class DatasetMapper(object):
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
         # we padd the image to make a sementic difference between real edges and stitching edges
         if not self._augment:
-
             return self._validation_crops(dataset_dict)
-
-
 
         image = detection_utils.read_image(dataset_dict["file_name"], format=self.img_format)
         image = cv2.copyMakeBorder(image, self._padding, self._padding,
@@ -336,8 +337,8 @@ class Dataset(BaseDataset):
                     boxes=target_fields.get("gt_boxes", None),
                     masks=target_fields.get("gt_masks", None),
                 )
-                cv2.imshow('training_data', vis.get_image()[:, :, ::-1])
-                if cv2.waitKey(-1) == 27:
+                cv2.imshow(subset, vis.get_image()[:, :, ::-1])
+                if cv2.waitKey(30) == 27:
                     return None
 
     def mapper(self, config, augment=True):
