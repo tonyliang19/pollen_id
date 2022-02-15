@@ -9,7 +9,7 @@ import networkx as nx
 from typing import List
 
 from sticky_pi_ml.siamese_insect_matcher.predictor import Predictor
-from sticky_pi_ml.siamese_insect_matcher.ml_bundle import MLBundle, ClientMLBundle
+from sticky_pi_ml.siamese_insect_matcher.ml_bundle import MLBundle
 from sticky_pi_ml.tuboid import Tuboid, TiledTuboid
 from sticky_pi_ml.image import ImageSeries
 
@@ -22,10 +22,12 @@ class Matcher(object):
         self._ml_bundle = ml_bundle
 
     def match_client(self, annotated_images_series: ImageSeries, video_dir: str = None):
+
+        from sticky_pi_ml.siamese_insect_matcher.ml_bundle import  ClientMLBundle
+
         series_info = annotated_images_series.info_dict
         series_info.update({'algo_name': self._ml_bundle.name,
                             'algo_version': self._ml_bundle.version})
-
         assert issubclass(type(self._ml_bundle), ClientMLBundle), \
             "This method only works for MLBundles linked to a client"
         client = self._ml_bundle.client

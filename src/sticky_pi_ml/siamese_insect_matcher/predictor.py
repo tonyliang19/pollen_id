@@ -4,12 +4,10 @@ import logging
 from functools import lru_cache
 from typing import Dict, Tuple, List, Any
 
-from sticky_pi_api.types import InfoType
-
 from sticky_pi_ml.predictor import BasePredictor
 from sticky_pi_ml.siamese_insect_matcher.model import SiameseNet
 from sticky_pi_ml.image import Image
-from sticky_pi_ml.siamese_insect_matcher.ml_bundle import MLBundle, ClientMLBundle
+from sticky_pi_ml.siamese_insect_matcher.ml_bundle import MLBundle
 from sticky_pi_ml.annotations import Annotation
 
 from sticky_pi_ml.siamese_insect_matcher.dataset import Dataset, DataEntry
