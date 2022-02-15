@@ -1,4 +1,4 @@
-
+import glob
 import io
 import json
 import os
@@ -124,6 +124,32 @@ class ImageSeries(list):
         for im in sorted(annotated_images, key=lambda x: x.datetime):
             self.append(im)
 
+class ImageSeriesSVGDir(ImageSeries):
+    def __init__(self, directory):
+
+        all_svgs = sorted([s for s in glob.glob(os.path.join(directory, "*.svg"))])
+        assert all_svgs, f"Could not find any SVG file in {directory}"
+        im_list = []
+        device = None
+        start_datetime = None
+        for s in all_svgs:
+            im = SVGImage(s)
+            if not start_datetime:
+                start_datetime = im.datetime
+            if device and im.device != device:
+                raise Exception(f"Different devices used {device} vs {im.device} in {s}")
+            device = im.device
+            im_list.append(im)
+
+        end_datetime = im.datetime
+
+        super().__init__(device, start_datetime, end_datetime)
+        for l in im_list:
+            self.append(l)
+
+    def populate_from_client(self, client, cache_image_dir=None):
+        raise  NotImplementedError
+
 
 class Image(object):
     def __init__(self, path: str, foreign: bool = False):
@@ -131,10 +157,11 @@ class Image(object):
         self._filename = os.path.basename(path)
         self._md5 = None
         self._foreign = foreign
+
         if not self._foreign:
             file_info = self._device_datetime_info(self._filename)
         else:
-            file_info = {'datetime': None, 'device':None}
+            file_info = {'datetime': None, 'device': None}
 
         self._datetime = file_info['datetime']
         self._device = file_info['device']
@@ -384,7 +411,7 @@ class Image(object):
 
 
 class SVGImage(Image):
-    def __init__(self, path, foreign: bool = True, skip_annotations=False):
+    def __init__(self, path, foreign: bool = False, skip_annotations=False):
         super().__init__(path, foreign)
         # the shape of the image within the svg document
         # will have to scale the contours  to match the actual dimensions of the embedded image
@@ -393,10 +420,6 @@ class SVGImage(Image):
         if not skip_annotations:
             self._parse_annotations()
 
-    def _parse(self, file):
-
-        self.update(self._device_datetime_info(self._filename))
-        self['md5'] = md5(self.extract_jpeg(as_buffer=True))
 
     def _img_buffer(self):
         encoded_string = base64.b64encode(self.extract_jpeg(as_buffer=True).read())
