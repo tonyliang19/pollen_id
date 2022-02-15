@@ -156,7 +156,7 @@ class Predictor(BasePredictor):
         largest_contour = np.argmax([cv2.contourArea(c) for c in contours])
         return contours[largest_contour]
 
-    def _detect_instances(self, img: Image, score_threshold=.50):
+    def _detect_instances(self, img: Image, score_threshold=.0):
         polys = []
         classes = []
         logging.debug(img)
@@ -200,7 +200,6 @@ class Predictor(BasePredictor):
             im_1 = array[o[1]: (o[1] + 1024), o[0]: (o[0] + 1024)]
             p = self._detectron_predictor(im_1)
             p_bt = p['instances'].pred_boxes.tensor
-
             big_enough = torch.zeros_like(p_bt[:, 0], dtype=torch.bool)
             big_enough = big_enough.__or__(p_bt[:, 2] - p_bt[:, 0] > self._ml_bundle.config.MIN_MAX_OBJ_SIZE[0])
             big_enough = big_enough.__or__(p_bt[:, 3] - p_bt[:, 1] > self._ml_bundle.config.MIN_MAX_OBJ_SIZE[0])
@@ -226,7 +225,7 @@ class Predictor(BasePredictor):
             if n < y_n_tiles - 1:
                 non_edge_cases = non_edge_cases.__and__(p_bt[:, 3] < 1024 - 32)
 
-            
+
             p['instances'] = p['instances'][non_edge_cases.__and__(big_enough)]
             p['instances'] = p['instances'][p['instances'].scores > score_threshold]
             classes_for_one_inst = []

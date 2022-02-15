@@ -48,41 +48,41 @@ class ValLossHook(HookBase):
         """
             After each step calculates the validation loss and adds it to the train storage
         """
-        if self._last_validation_output is None or ( self.trainer.iter + 1) % self.cfg.TEST_PERIOD == 0:
+        if self._last_validation_output and (self.trainer.iter + 1) % self.cfg.TEST_PERIOD != 0:
+            return
 
-            loader = self.trainer.build_test_loader(self.cfg, self._dataset_name)
+        loader = self.trainer.build_test_loader(self.cfg, self._dataset_name)
 
-            with torch.no_grad():
-                all_losses = []
-                overall_n_instances = 0
-                for d in loader:
+        with torch.no_grad():
+            all_losses = []
+            overall_n_instances = 0
+            for d in loader:
 
-                    loss_dict = self.trainer.model(d)
-                    losses = sum(loss_dict.values())
-                    assert torch.isfinite(losses).all(), loss_dict
+                loss_dict = self.trainer.model(d)
+                losses = sum(loss_dict.values())
+                assert torch.isfinite(losses).all(), loss_dict
 
-                    loss_dict_reduced = {"val_" + k: v.item() for k, v in comm.reduce_dict(loss_dict).items()}
-                    total_loss = sum(loss for loss in loss_dict_reduced.values())
-                    loss_dict_reduced["val_total_loss"] = total_loss
-                    n_instances = sum([len(i["instances"]) for i in d])
-                    # all_losses_times_n_instances.append(loss_dict_reduced/n_instances)
-                    loss_dict_reduced["val_instance_weighted_total_loss"] = total_loss * n_instances
-                    all_losses.append(loss_dict_reduced)
-                    overall_n_instances += n_instances
-                    
-                out = None
-                for d in all_losses:
-                    if out is None:
-                        out = {k: v / len(all_losses) for k, v in d.items()}
-                    else:
-                        for k, v in d.items():
-                            out[k] += v / len(all_losses)
-                out["val_instance_weighted_total_loss"] /= overall_n_instances
-                out["val_instance_weighted_total_loss"] *= len(all_losses)
-                self._last_validation_output = out
+                loss_dict_reduced = {"val_" + k: v.item() for k, v in comm.reduce_dict(loss_dict).items()}
+                total_loss = sum(loss for loss in loss_dict_reduced.values())
+                loss_dict_reduced["val_total_loss"] = total_loss
+                n_instances = sum([len(i["instances"]) for i in d])
+                # all_losses_times_n_instances.append(loss_dict_reduced/n_instances)
+                loss_dict_reduced["val_instance_weighted_total_loss"] = total_loss * n_instances
+                all_losses.append(loss_dict_reduced)
+                overall_n_instances += n_instances
 
-                if comm.is_main_process():
-                    self.trainer.storage.put_scalars(**self._last_validation_output)
+            out = None
+            for d in all_losses:
+                if out is None:
+                    out = {k: 0 for k, v in d.items()}
+                for k, v in d.items():
+                    out[k] += v / len(all_losses)
+            out["val_instance_weighted_total_loss"] /= overall_n_instances
+            out["val_instance_weighted_total_loss"] *= len(all_losses)
+            self._last_validation_output = out
+
+            if comm.is_main_process():
+                self.trainer.storage.put_scalars(**self._last_validation_output)
 
 
 class DetectronTrainer(DefaultDetectronTrainer):
