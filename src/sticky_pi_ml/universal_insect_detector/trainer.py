@@ -129,7 +129,7 @@ class Trainer(BaseTrainer):
         for v in self._ml_bundle.dataset.validation_data:
             original_svg = v["original_svg"]
 
-            gt = SVGImage(original_svg)
+            gt = SVGImage(original_svg, foreign=True)
             im = predictor.detect(gt)
             o = self._score_vs_gt(gt, im)
 
@@ -166,20 +166,6 @@ class Trainer(BaseTrainer):
 
     def _score_vs_gt_one_class(self, gt_a, im_a, iou_threshold, obj_class, filename):
         out = []
-
-        # if len(gt_a) == 0:
-            # if len(im_a) == 0:
-            #     return {'recall': 1,
-            #             'precision': 1}
-            # else:
-            #     return {'recall': 0,
-            #             'precision': 0}
-        #     for
-        # if len(im_a) == 0:
-        #
-        #     return {'recall': 0,
-        #             'precision': 0}
-
         if len(im_a) == 0:
             if len(gt_a) == 0:
                 return {}

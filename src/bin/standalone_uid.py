@@ -1,11 +1,11 @@
+import argparse
+import logging
 import os
 import glob
 from sticky_pi_ml.universal_insect_detector.ml_bundle import MLBundle
 from sticky_pi_ml.universal_insect_detector.predictor import Predictor
 from sticky_pi_ml.universal_insect_detector.trainer import Trainer
 from sticky_pi_ml.image import Image
-import argparse
-import logging
 
 # ML bundle
 
@@ -105,7 +105,15 @@ if __name__ == '__main__':
         t.train()
 
     if option_dict['action'] == 'check_data':
-        bundle.dataset.prepare()
+
+        t = Trainer(bundle) # prepare data, implicitly
+        loader = t._detectron_trainer.build_test_loader(bundle.config, bundle.name + "_val")
+
+        # for i in loader:
+        #     pass
+        # loader = t._detectron_trainer.build_test_loader(bundle.config,  bundle.name + "_train")
+        # for i in loader:
+        #     pass
 
     elif option_dict['action'] == 'validate':
         t = Trainer(bundle)
@@ -114,4 +122,5 @@ if __name__ == '__main__':
         t.validate(pred, out_dir=option_dict['target'])
 
     elif option_dict['action'] == 'visualise':
+        # bundle.dataset.visualise(subset="val")
         bundle.dataset.visualise()
