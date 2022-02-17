@@ -34,6 +34,8 @@ except ImportError:
 class Predictor(BasePredictor):
     _detect_client_chunk_size = 64
     _minimum_tile_overlap = 500
+    _score_threshold = 0.2
+    _iou_threshold = 0.33
 
     def __init__(self, ml_bundle: Ml_bundle_type):
         super().__init__(ml_bundle)
@@ -156,7 +158,7 @@ class Predictor(BasePredictor):
         largest_contour = np.argmax([cv2.contourArea(c) for c in contours])
         return contours[largest_contour]
 
-    def _detect_instances(self, img: Image, score_threshold=.0):
+    def _detect_instances(self, img: Image):
         polys = []
         classes = []
         logging.debug(img)
@@ -227,10 +229,11 @@ class Predictor(BasePredictor):
 
 
             p['instances'] = p['instances'][non_edge_cases.__and__(big_enough)]
-            p['instances'] = p['instances'][p['instances'].scores > score_threshold]
+            p['instances'] = p['instances'][p['instances'].scores > self._score_threshold]
             classes_for_one_inst = []
             poly_for_one_inst = []
 
+            #fixme, this could be parallelised
             for i in range(len(p['instances'])):
                 instance_offset = (o[0] - self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
                                    o[1] - self._ml_bundle.config.ORIGINAL_IMAGE_PADDING)
@@ -271,7 +274,7 @@ class Predictor(BasePredictor):
                         iou = p_shape_1.intersection(p_shape_2).area / p_shape_1.union(p_shape_2).area
                     except Exception as e:
                         iou = 1  # fixme topological exception
-                    if iou > 0.5:
+                    if iou > self._iou_threshold:
                         add = False
                         continue
                 if add:
