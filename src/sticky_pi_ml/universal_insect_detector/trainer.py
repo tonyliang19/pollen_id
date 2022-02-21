@@ -126,10 +126,14 @@ class Trainer(BaseTrainer):
 
     def validate(self, predictor: Predictor, out_dir: str = None, gt_fill_colour: str = '#0000ff'):
         out = []
+        validation_files = []
         for v in self._ml_bundle.dataset.validation_data:
             original_svg = v["original_svg"]
+            if original_svg not in validation_files:
+                validation_files.append(original_svg)
 
-            gt = SVGImage(original_svg, foreign=True)
+        for v in validation_files:
+            gt = SVGImage(v, foreign=True)
             im = predictor.detect(gt)
             o = self._score_vs_gt(gt, im)
 
