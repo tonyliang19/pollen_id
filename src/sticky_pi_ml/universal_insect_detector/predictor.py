@@ -34,7 +34,7 @@ except ImportError:
 class Predictor(BasePredictor):
     _detect_client_chunk_size = 64
     _minimum_tile_overlap = 500
-    _score_threshold = 0.75
+    _score_threshold = 0.85
     _iou_threshold = 0.33
 
     def __init__(self, ml_bundle: Ml_bundle_type):
