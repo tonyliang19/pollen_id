@@ -20,7 +20,7 @@ import pandas as pd
 from typing import Union
 
 try:
-    import ClientMLBundle
+    from sticky_pi_ml.universal_insect_detector.ml_bundle import ClientMLBundle
     from sticky_pi_api.types import InfoType
 
     Ml_bundle_type = Union[ClientMLBundle, MLBundle]
