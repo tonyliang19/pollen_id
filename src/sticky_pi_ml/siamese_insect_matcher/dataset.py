@@ -14,6 +14,7 @@ import cv2
 from torch.utils.data import Dataset as TorchDataset
 from torchvision.transforms import ToTensor, Compose
 from detectron2.data import transforms
+import random
 
 from sticky_pi_ml.dataset import BaseDataset
 from sticky_pi_ml.annotations import Annotation
@@ -82,7 +83,7 @@ class DataEntry(object):
         dist = log10(dist + 1)
 
         self._log_dist = torch.Tensor([dist])
-        assert a1.datetime > a0.datetime, (a1.datetime,  a0.datetime)
+        assert a1.datetime > a0.datetime, (a1.datetime, a0.datetime)
         delta_t = float((a1.datetime - a0.datetime).total_seconds())
 
         if dist_t_transforms is not None:
@@ -99,7 +100,6 @@ class DataEntry(object):
         self._ar = abs(log10(a1.area) - log10(a0.area))
         self._ar = torch.Tensor([self._ar])
         self._area_0 = torch.Tensor([log10(a0.area)])
-
 
     def as_dict(self, add_dim=False):
         out = {'x0': self._x0,
@@ -137,6 +137,8 @@ class DataEntry(object):
 
 
 class OurTorchDataset(TorchDataset):
+    _prob_neg = 0.50
+
     def __init__(self, data_dicts, augment=True):
 
         self._augment = augment
@@ -163,8 +165,10 @@ class OurTorchDataset(TorchDataset):
                 self._negative_data_pairs.append(d)
 
     def _get_one(self, item: int):
+        assert item < len(self), f"Cannot get item {item}, total number dataset size: {len(self)}"
         if item >= len(self._positive_data_pairs):
-            entry = self._negative_data_pairs[item % len(self._positive_data_pairs)]
+            item -= len(self._positive_data_pairs)
+            entry = self._negative_data_pairs[item]
         else:
             entry = self._positive_data_pairs[item]
 
@@ -179,18 +183,34 @@ class OurTorchDataset(TorchDataset):
         for i in range(self.__len__()):
             yield self._get_one(i)
 
-    def __getitem__(self, item, prob_neg=0.50):
-        if random.random() > prob_neg:
-            # positives
-            return self._get_one(random.randint(0, len(self._positive_data_pairs)))
+    def __getitem__(self, item):
+
+        if random.random() > self._prob_neg:
+            return self._get_one(random.randint(0, len(self._positive_data_pairs) - 1))
         else:
-            return self._get_one(random.randint(len(self._positive_data_pairs), self.__len__()))
+            return self._get_one(random.randint(len(self._positive_data_pairs), len(self) - 1))
 
     def __len__(self):
         return len(self._negative_data_pairs) + len(self._positive_data_pairs)
 
 
+class OurTorchDatasetValid(OurTorchDataset):
+    def __init__(self, data_dicts, augment=False):
+        super().__init__(data_dicts, augment)
+
+        # we randomize the order for validation
+        random.seed(1)
+        self._index_random_order = [i for i in range(len(self))]
+        random.shuffle(self._index_random_order)
+
+    def __getitem__(self, item):
+        return self._get_one(self._index_random_order[item])
+
+
 class Dataset(BaseDataset):
+    _dataset_maps = {"val": OurTorchDatasetValid,
+                     "train": OurTorchDataset}
+
     def __init__(self, data_dir, config, cache_dir):
         super().__init__(data_dir, config, cache_dir)
 
@@ -203,6 +223,8 @@ class Dataset(BaseDataset):
                 self._validation_data.append(entry)
             else:
                 self._training_data.append(entry)
+        logging.info(f"Training set:   {len(self._training_data)} pairs")
+        logging.info(f"Validation set: {len(self._validation_data)} pairs")
 
     def _serialise_imgs_to_dicts(self, input_img_list: List[str]):
 
@@ -210,12 +232,13 @@ class Dataset(BaseDataset):
 
         @mem.cache
         def cached_serialise(path, mtime):
+            # mtime is not used, it is just for caching arguments
             pos_pairs = []
             neg_pairs = []
             iou_max_n_discarded = 0
 
             ssvg = SiamSVG(path)
-            print('Serializing: %s. N_pairs = %i ' % (os.path.basename(path), len(ssvg.annotation_pairs)))
+            logging.info('Serializing: %s. N_pairs = %i ' % (os.path.basename(path), len(ssvg.annotation_pairs)))
             md5_sum = md5(path)
             a0_annots = []
             a1_annots = []
@@ -225,11 +248,8 @@ class Dataset(BaseDataset):
 
             for i, a0 in enumerate(a0_annots):
                 for j, a1 in enumerate(a1_annots):
-                    # im1 = a1.parent_image.read()
                     if i < j:
                         continue
-
-                    iou_val = iou(a0.polygon, a1.polygon)
 
                     data = {'a0': a0, 'a1': a1, 'n_pairs': len(ssvg.annotation_pairs)}
                     if i == j:
@@ -245,23 +265,20 @@ class Dataset(BaseDataset):
         # results = [cached_serialise(s, os.path.getmtime(s)) for s in sorted(input_img_list)]
         pos_pairs = []
         neg_pairs = []
-        iou_max_n_discarded = 0
 
         for p, n, i in results:
             pos_pairs += p
             neg_pairs += n
-            iou_max_n_discarded += i
 
-        logging.info('Serialized: %i positive and %i negative. Discarded %i matches with iou>max_iou' %
-                     (len(pos_pairs), len(neg_pairs), iou_max_n_discarded))
+        logging.info('Serialized: %i positive and %i negative.' %
+                     (len(pos_pairs), len(neg_pairs)))
         return pos_pairs + neg_pairs
 
-
-
     def _get_torch_dataset(self, subset='train', augment=False):
-        assert subset in {'train', 'val'}, 'subset should be either "train" or "val"'
+        assert subset in self._dataset_maps.keys(), 'subset should be either "train" or "val"'
+        DatasetClass = self._dataset_maps[subset]
         data = self._training_data if subset == 'train' else self._validation_data
-        return OurTorchDataset(data, augment=augment)
+        return DatasetClass(data, augment=augment)
 
     def visualise(self, subset='train', augment=False, interactive=True):
         import cv2
@@ -286,4 +303,3 @@ class Dataset(BaseDataset):
                 cv2.waitKey(-1)
             else:
                 assert isinstance(buff, np.ndarray)
-
