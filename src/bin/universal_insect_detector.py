@@ -59,11 +59,11 @@ if __name__ == '__main__':
         pred = Predictor(ml_bundle)
         pred.detect_client()
 
-    elif option_dict['action'] == 'predict-dir':
-        client = make_client(option_dict)
-        ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
-        pred = Predictor(ml_bundle)
-        pred.detect_client()
+    # elif option_dict['action'] == 'predict-dir':
+    #     client = make_client(option_dict)
+    #     ml_bundle = ClientMLBundle(bundle_dir, client, device=option_dict['device'], cache_dir=ml_bundle_cache)
+    #     pred = Predictor(ml_bundle)
+    #     pred.detect_client()
 
 
     elif option_dict['action'] == 'push':

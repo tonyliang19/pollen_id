@@ -10,6 +10,7 @@ setup(
     scripts=['bin/universal_insect_detector.py',
              'bin/standalone_uid.py',
              'bin/siamese_insect_matcher.py',
+             'bin/standalone_sim.py',
              'bin/insect_tuboid_classifier.py'],
     include_package_data=True,
     zip_safe=False,
