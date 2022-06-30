@@ -5,27 +5,21 @@ import logging
 import os
 import numpy as np
 from typing import List, Tuple, Union, IO
-from shapely.geometry import Polygon
-
-# import cv2
-# import dotenv
-# import numpy as np
-# import pandas as pd
 # from shapely.geometry import Polygon
 
 # STRING_DATETIME_FORMAT = '%Y-%m-%d_%H-%M-%S'
 
 
-def iou(poly1: Polygon, poly2: Polygon):
+# def iou(poly1: Polygon, poly2: Polygon):
 
-    try:
-        inter = poly1.intersection(poly2).area
-        if inter == 0:
-            return 0
-        return inter/poly1.union(poly2).area
-    except Exception as e:
-        logging.error(e)
-        return 0
+#     try:
+#         inter = poly1.intersection(poly2).area
+#         if inter == 0:
+#             return 0
+#         return inter/poly1.union(poly2).area
+#     except Exception as e:
+#         logging.error(e)
+#         return 0
 
 
 def md5(file: Union[IO, str], chunksize=32768):
@@ -42,50 +36,31 @@ def md5(file: Union[IO, str], chunksize=32768):
     return hash_md5.hexdigest()
 
 
-def iou_match_pairs(arr: np.ndarray, iou_threshold: float) -> List[Tuple[int, int]]:
-    """
-    :param arr: a triangular 2d array containing iou values
-    :param iou_threshold: the threshold under which two objects do not match
-    :return: A list of matched object, by index. None for no match.
-    """
-    pairs = []
-    arr[arr < iou_threshold] = 0
+# def iou_match_pairs(arr: np.ndarray, iou_threshold: float) -> List[Tuple[int, int]]:
+#     """
+#     :param arr: a triangular 2d array containing iou values
+#     :param iou_threshold: the threshold under which two objects do not match
+#     :return: A list of matched object, by index. None for no match.
+#     """
+#     pairs = []
+#     arr[arr < iou_threshold] = 0
 
-    gt_not_in_im = np.where(np.sum(arr, axis=1) == 0)[0]
-    im_not_in_gt = np.where(np.sum(arr, axis=0) == 0)[0]
+#     gt_not_in_im = np.where(np.sum(arr, axis=1) == 0)[0]
+#     im_not_in_gt = np.where(np.sum(arr, axis=0) == 0)[0]
 
-    for g in gt_not_in_im:
-        pairs.append((g, None))
+#     for g in gt_not_in_im:
+#         pairs.append((g, None))
 
-    for i in im_not_in_gt:
-        pairs.append((None, i))
+#     for i in im_not_in_gt:
+#         pairs.append((None, i))
 
-    while np.sum(arr) > 0:
-        i, j = np.unravel_index(arr.argmax(), arr.shape)
-        pairs.append((i, j))
-        arr[i, :] = 0
-        arr[:, j] = 0
-    return pairs
+#     while np.sum(arr) > 0:
+#         i, j = np.unravel_index(arr.argmax(), arr.shape)
+#         pairs.append((i, j))
+#         arr[i, :] = 0
+#         arr[:, j] = 0
+#     return pairs
 
-
-# def pad_to_square(array: np.ndarray, size: int):
-#     old_size = array.shape[:2]  # old_size is in (height, width) format
-#     ratio = float(size) / max(old_size)
-#     new_size = tuple([int(x * ratio) for x in old_size])
-
-#     # new_size should be in (width, height) format
-
-#     array = cv2.resize(array, (new_size[1], new_size[0]))
-
-#     delta_w = size - new_size[1]
-#     delta_h = size - new_size[0]
-#     top, bottom = delta_h // 2, delta_h - (delta_h // 2)
-#     left, right = delta_w // 2, delta_w - (delta_w // 2)
-
-#     color = [0, 0, 0]
-#     new_im = cv2.copyMakeBorder(array, top, bottom, left, right, cv2.BORDER_CONSTANT,
-#                                 value=color)
-#     return new_im
 
 
 
@@ -163,14 +138,5 @@ def iou_match_pairs(arr: np.ndarray, iou_threshold: float) -> List[Tuple[int, in
 #         option_dict.update(env_conf)
 #         return option_dict
 
-
-# def string_to_datetime(string):
-#     return datetime.datetime.strptime(string, STRING_DATETIME_FORMAT)
-
-
-# def datetime_to_string(dt):
-#     if pd.isnull(dt):
-#         return None
-#     return datetime.datetime.strftime(dt, STRING_DATETIME_FORMAT)
 
 
