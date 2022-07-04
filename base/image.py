@@ -21,8 +21,8 @@ import requests
 import svgpathtools
 from cairosvg import svg2png
 # from sticky_pi_ml.utils import datetime_to_string, string_to_datetime
-from sticky_pi_ml.annotations import Annotation, DictAnnotation
-
+#from sticky_pi_ml.annotations import Annotation, DictAnnotation
+from base.annotations import Annotation, DictAnnotation
 # from sticky_pi_ml.utils import md5
 #"from src.sticky_pi_ml.utils import string_to_datetime, datetime_to_string, md5
 

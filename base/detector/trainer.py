@@ -14,7 +14,7 @@ import detectron2.utils.comm as comm
 
 
 # from detector.predictor import Predictor
-from sticky_pi_ml.image import SVGImage
+from base.image import SVGImage
 # from base.utils import iou, iou_match_pairs
 from base.trainer import BaseTrainer
 from base.detector.ml_bundle import MLBundle

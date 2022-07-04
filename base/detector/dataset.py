@@ -18,7 +18,7 @@ from typing import List
 from base.utils import md5
 from base.dataset import BaseDataset
 from functools import partial
-from sticky_pi_ml.image import SVGImage
+from base.image import SVGImage
 from detectron2.structures.boxes import BoxMode
 from detectron2.data.catalog import DatasetCatalog, MetadataCatalog
 from detectron2.utils.visualizer import Visualizer
