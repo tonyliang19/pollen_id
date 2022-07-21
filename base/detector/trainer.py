@@ -1,19 +1,13 @@
-import json
-import os
-import logging
-import numpy as np
 import cv2
 import torch
-
-# from shapely.geometry import Polygon
-
+from shapely.geometry import Polygon
 from detectron2.engine import DefaultTrainer as DefaultDetectronTrainer, PeriodicWriter
 from detectron2.data import  build_detection_test_loader, build_detection_train_loader
 from detectron2.engine import HookBase
 import detectron2.utils.comm as comm
 
 
-# from detector.predictor import Predictor
+from base.detector.predictor import Predictor
 from base.image import SVGImage
 # from base.utils import iou, iou_match_pairs
 from base.trainer import BaseTrainer

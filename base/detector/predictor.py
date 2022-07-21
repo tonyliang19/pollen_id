@@ -1,12 +1,15 @@
 import torch
 import numpy as np
-import pandas as pd
+from shapely.geometry import Polygon
 from base.image import Image
 from typing import Tuple, Dict, List, Any
 from base.annotations import Annotation
 from base.predictor import BasePredictor
 from base.detector.ml_bundle import MLBundle
 from detectron2.engine import DefaultPredictor
+import cv2
+import logging
+import math
 
 
 class Predictor(BasePredictor):
@@ -20,76 +23,7 @@ class Predictor(BasePredictor):
         self._min_width = self._ml_bundle.config.MIN_MAX_OBJ_SIZE[0]
         self._detectron_predictor = DefaultPredictor(self._ml_bundle.config)
 
-    def detect_client(self, info: InfoType = None, *args, **kwargs):
-        assert issubclass(type(self._ml_bundle), ClientMLBundle), \
-            "This method only works for MLBundles linked to a client"
-
-        client = self._ml_bundle.client
-
-        if info is None:
-            info = [{'device': '%',
-                     'start_datetime': "1970-01-01_00-00-00",
-                     'end_datetime': "2070-01-01_00-00-00"}]
-            logging.info('No info provided. Fetching all annotations')
-        while True:
-            client_resp = client.get_images_with_uid_annotations_series(info, what_image='metadata',
-                                                                        what_annotation='metadata')
-
-            if len(client_resp) == 0:
-                return
-
-            df = pd.DataFrame(client_resp)
-
-            if 'algo_name' not in df.columns:
-                logging.info('No annotations for the requested images. Fetching all!')
-                df['algo_version'] = None
-                df['algo_name'] = ""
-
-            df = df.sort_values(by=['algo_version', 'datetime'])
-            df = df.drop_duplicates(subset=['id'], keep='last')
-
-            # here, we filter/sort df to keep only images that are not annotated by this version.
-            # we sort by version tag
-
-            conditions = (self.version > df.algo_version) | \
-                         (df.algo_version.isnull()) | \
-                         (self.name != df.algo_name)
-
-            df = df[conditions]
-            if len(df) == 0:
-                logging.info('All annotations uploaded!')
-                return
-
-            query = [df.iloc[i][['device', 'datetime']].to_dict() for i in
-                     range(min(len(df), self._detect_client_chunk_size))]
-            image_data = client.get_images(info=query, what='image')
-            urls = [im['url'] for im in image_data]
-
-            all_annots = []
-            for u in urls:
-                temp_dir = None
-                try:
-                    if not os.path.isfile(u):
-                        temp_dir = tempfile.mkdtemp()
-                        filename = os.path.basename(u).split('?')[0]
-                        resp = requests.get(u).content
-                        with open(os.path.join(temp_dir, filename), 'wb') as file:
-                            file.write(resp)
-                        u = os.path.join(temp_dir, filename)
-
-                    im = Image(u)
-                    annotated_im = self.detect(im, *args, **kwargs)
-                    logging.info('Detecting in image %s' % im)
-                    annots = annotated_im.annotation_dict(as_json=False)
-                    all_annots.append(annots)
-                    logging.info("Staging annotations: %s" % annotated_im)
-                finally:
-                    if temp_dir:
-                        shutil.rmtree(temp_dir)
-
-            logging.info("Sending %i annotations to client" % len(all_annots))
-            client.put_uid_annotations(all_annots)
-
+    
     def detect(self, image: Image, *args, **kwargs) -> Image:
 
         instances = self._detect_instances(image, *args, **kwargs)
@@ -140,13 +74,13 @@ class Predictor(BasePredictor):
         classes = []
         logging.debug(img)
 
-        array = cv2.copyMakeBorder(img.read(),
-                                   self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
-                                   self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
-                                   self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
-                                   self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
-                                   cv2.BORDER_CONSTANT, value=(0, 0, 0))
-        # array = img.read()
+        # array = cv2.copyMakeBorder(img.read(),
+        #                            self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
+        #                            self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
+        #                            self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
+        #                            self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
+        #                            cv2.BORDER_CONSTANT, value=(0, 0, 0))
+        array = img.read()
 
         # todo
         # make exception to removing edge objects on the edge of the actual image
@@ -258,8 +192,7 @@ class Predictor(BasePredictor):
                     all_valid.append((origin, classes[origin][i], p1))
         annotation_list = []
         for _, pred_class, poly in all_valid:
-            stroke = self._palette.get_stroke_from_id(pred_class)
-            class_name = self._palette.get_class_from_id(pred_class)
+            stroke = "#00ff80"
             a = Annotation(poly, parent_image=img, stroke_colour=stroke, name=class_name)
             annotation_list.append(a)
         return annotation_list

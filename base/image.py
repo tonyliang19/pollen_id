@@ -1,5 +1,4 @@
 import base64
-import datetime
 import glob
 import io
 import json
@@ -16,72 +15,9 @@ import PIL.ExifTags
 import PIL.Image
 import cv2
 import numpy as np
-import pandas as pd
-import requests
 import svgpathtools
 from cairosvg import svg2png
-# from sticky_pi_ml.utils import datetime_to_string, string_to_datetime
-#from sticky_pi_ml.annotations import Annotation, DictAnnotation
 from base.annotations import Annotation, DictAnnotation
-# from sticky_pi_ml.utils import md5
-#"from src.sticky_pi_ml.utils import string_to_datetime, datetime_to_string, md5
-
-
-class ImageSeries(list):
-    def __init__(self, device: str, start_datetime: Union[str, datetime.datetime],
-                 end_datetime: Union[str, datetime.datetime]):
-        super().__init__()
-        self._device = device
-        self._start_datetime = start_datetime
-        self._end_datetime = end_datetime
-        self._info_dict = {'device': self._device,
-                           'start_datetime': self._start_datetime,
-                           'end_datetime': self._end_datetime}
-
-    def __repr__(self):
-        return self.name
-
-    @property
-    def info_dict(self):
-        return self._info_dict
-
-    @property
-    def start_datetime(self):
-        return self._start_datetime
-
-    @property
-    def end_datetime(self):
-        return self._end_datetime
-
-    @property
-    def name(self):
-        return self._device
-
-class ImageSeriesSVGDir(ImageSeries):
-    def __init__(self, directory):
-
-        all_svgs = sorted([s for s in glob.glob(os.path.join(directory, "*.svg"))])
-        assert all_svgs, f"Could not find any SVG file in {directory}"
-        im_list = []
-        device = None
-        start_datetime = None
-        for s in all_svgs:
-            im = SVGImage(s)
-            if not start_datetime:
-                start_datetime = im.datetime
-            if device and im.device != device:
-                raise Exception(f"Different devices used {device} vs {im.device} in {s}")
-            device = im.device
-            im_list.append(im)
-
-        end_datetime = im.datetime
-
-        super().__init__(device, start_datetime, end_datetime)
-        for l in im_list:
-            self.append(l)
-
-    def populate_from_client(self, client, cache_image_dir=None):
-        raise  NotImplementedError
 
 
 class Image(object):
@@ -90,50 +26,12 @@ class Image(object):
         self._filename = os.path.basename(path)
         self._md5 = None
         self._foreign = foreign
-
-        #if not self._foreign:
-        #    file_info = self._device_datetime_info(self._filename)
-        #else:
-        #    file_info = {'datetime': None, 'device': None}
-
-        #self._datetime = file_info['datetime']
-        #self._device = file_info['device']
         self._annotations = []
         self._metadata = None
         self._shape = None
         self._cached_image = None
 
-    #def __repr__(self):
-    #   return "%s: %s.%s" % (self.__class__, self._device, self.datetime_str)
-
-    #def __str__(self):
-    #    return self.__repr__()
-
-    # def _device_datetime_info(self, filename: str):
-    #     fields = filename.split('.')
-
-    #     if len(fields) != 3:
-    #         raise Exception("Wrong file name, three dot-separated fields expected")
-
-    #     device = fields[0]
-    #     try:
-    #         if len(device) != 8:
-    #             raise ValueError()
-    #         int(device, base=16)
-    #     except ValueError:
-    #         raise Exception("Invalid device name field in file: %s" % device)
-
-    #     datetime_string = fields[1]
-    #     try:
-    #         date_time = datetime.datetime.strptime(datetime_string, '%Y-%m-%d_%H-%M-%S')
-    #         # date_time = self._timezone.localize(date_time)
-    #     except ValueError:
-    #         raise Exception("Could not retrieve datetime from filename")
-
-    #     return {'device': device,
-    #             'datetime': date_time,
-    #             'filename': filename}
-
+   
     # when automatically annotating an image, we can tag the version
     @property
     def algo_version(self):
@@ -190,10 +88,6 @@ class Image(object):
         return self._shape
 
     @property
-    def device(self):
-        return self._device
-
-    @property
     def path(self):
         return self._path
 
@@ -201,10 +95,6 @@ class Image(object):
     def datetime(self):
         return self._datetime
 
-    @property
-    def datetime_str(self):
-        return 0  # use this as a temporary stub
-        # return self._datetime.strftime('%Y-%m-%d_%H-%M-%S')
 
     @property
     def filename(self):
@@ -335,15 +225,7 @@ class Image(object):
     def set_annotations(self, annotations):
         self._annotations = annotations
 
-    # def _get_file_fields(self, path):
-    #
-    #     filename = os.path.basename(path)
-    #     device, date_time = device_datetime_from_filename(filename)
-    #
-    # return {'device': device,
-    #         'datetime': date_time}
-
-
+    
 class SVGImage(Image):
     def __init__(self, path, foreign: bool = False, skip_annotations=False):
         super().__init__(path, foreign)

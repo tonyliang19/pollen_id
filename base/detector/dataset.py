@@ -1,30 +1,25 @@
-# from torch.utils.data import Dataset
-# from torch.utils.data import DataLoader
-# import image as img
 import torch
-# from PIL import Image as im
 import numpy as np
 import cv2
-from multiprocessing import Pool
 import os
 import gzip
-# import itertools
 import copy
 import glob
-# import math
 import logging
 import pickle
 from typing import List
 from base.utils import md5
 from base.dataset import BaseDataset
-from functools import partial
 from base.image import SVGImage
+from PIL import Image
 from detectron2.structures.boxes import BoxMode
 from detectron2.data.catalog import DatasetCatalog, MetadataCatalog
 from detectron2.utils.visualizer import Visualizer
 from detectron2.data import transforms as T
 from detectron2.data import detection_utils as du
 from detectron2.data import build_detection_test_loader, build_detection_train_loader
+from torchvision.transforms import ColorJitter
+from detectron2.data import transforms as T
 
 
 try:
@@ -46,35 +41,36 @@ except ImportError:
 class Dataset(BaseDataset):
     def __init__(self, data_dir, cache_dir, config):
         super().__init__(data_dir=data_dir, cache_dir=cache_dir, config=config)
-        # print(f"this is __init_, cache dir = {self._cache_dir}, config = {self._config}")
-
+        
     def _prepare(self):
-        input_img_list = sorted(glob.glob(os.path.join(self._data_dir, "*.svg")))
-        data = self._serialise_imgs_to_dicts(input_img_list)
-        # print(f"length of data: {len(data)}")
-        while len(data) > 0:
-            entry = data.pop()
-            # print(entry["file_name"])
+        if not self._is_prepared:
+            input_img_list = sorted(glob.glob(os.path.join(self._data_dir, "*.svg")))
+            data = self._serialise_imgs_to_dicts(input_img_list)
+            while len(data) > 0:
+                entry = data.pop()
 
-            if entry["md5"] > self._md5_max_training:
-                # for dat in self._validation_data:
-                #     if entry["file_name"] not in dat["file_name"]:
-                # for e in self._validation_sub_image(entry):
-                #     print(f"Appending to validation")
-                self._validation_data.append(entry)
+                if entry["md5"] > self._md5_max_training:
 
-            else:
-                self._training_data.append(entry)
+                    self._validation_data.append(entry)
 
-        DatasetCatalog.register(self._config.DATASETS.TRAIN[0], lambda: self._training_data)
-        MetadataCatalog.get(self._config.DATASETS.TRAIN[0]).set(thing_classes=self._config.CLASSES)
-        DatasetCatalog.register(self._config.DATASETS.TEST[0], lambda: self._validation_data)
-        MetadataCatalog.get(self._config.DATASETS.TEST[0]).set(thing_classes=self._config.CLASSES)
+                else:
+                    self._training_data.append(entry)
 
-        logging.info(
-            f"N_train = {len(self._training_data)}")
-        logging.info(
-            f"N_validation = {len(self._validation_data)}")
+            if not self._config.DATASETS.TRAIN[0] in DatasetCatalog:
+                DatasetCatalog.register(self._config.DATASETS.TRAIN[0], lambda: self._training_data)
+                MetadataCatalog.get(self._config.DATASETS.TRAIN[0]).set(thing_classes=self._config.CLASSES)
+            if not self._config.DATASETS.TEST[0] in DatasetCatalog:
+                DatasetCatalog.register(self._config.DATASETS.TEST[0], lambda: self._validation_data)
+                MetadataCatalog.get(self._config.DATASETS.TEST[0]).set(thing_classes=self._config.CLASSES)
+
+
+            logging.info(
+                f"N_train = {len(self._training_data)}")
+            logging.info(
+                f"N_validation = {len(self._validation_data)}")
+            self._is_prepared = True
+        
+
 
     def _serialise_imgs_to_dicts(self, input_img_list: List[str]):
 
@@ -132,7 +128,27 @@ class Dataset(BaseDataset):
         return DatasetMapper(config, augment)
 
 
+class OurColorJitter(Augmentation):
+
+    def __init__(self, brightness, contrast, saturation, hue):
+        self._tv_transform = ColorJitter(brightness, contrast, saturation, hue)
+
+        super().__init__()
+        # self._init(locals())
+
+    def get_transform(self, image):
+        with torch.no_grad():
+            # img = torch.from_numpy(image.transpose((2, 0, 1))).contiguous()
+            # img = torch.zeros_like(img)
+            img = Image.fromarray(np.uint8(image))
+            image = self._tv_transform(img)
+            image = np.array(image)
+            # image = image.numpy().transpose((1, 2, 0))
+        return T.BlendTransform(src_image=image, src_weight=1, dst_weight=0)
+
+
 class DatasetMapper(object):
+    
     def __init__(self, cfg, augment=True):
         self._augment = augment
         # add more transformations vvv here below
@@ -262,8 +278,7 @@ def _create_jpg_from_svg(file, cache_dir):
 
 
 def _parse_one_image(svg_file, cache_dir, config):
-    # print(f"This is parse one image: , {cache_dir}, {config}")
-    # return
+
     pre_extracted_jpg = _create_jpg_from_svg(svg_file, cache_dir)
 
     with open(pre_extracted_jpg, 'rb') as im_file:

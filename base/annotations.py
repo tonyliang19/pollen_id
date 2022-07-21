@@ -55,53 +55,19 @@ class Annotation(object):
         return width
 
 
-    def subimage(self, masked=False,
-                 mask_in_alpha=False,
-                 cache_parent_image=True,
-                 source_array: np.array = None):
-        x, y, w, h = self._bbox
-        if source_array is None:
-            pim = self.parent_image_array(cache=cache_parent_image)
-        else:
-            pim = source_array
-
-        h = min(pim.shape[0], y + h) - max(0, y)
-        w = min(pim.shape[1], x + w) - max(0, x)
-
-        y = max(0, y)
-        x = max(0, x)
-
-        array_copy = pim[y: y + h, x: x + w]
-
-
-        if masked or mask_in_alpha:
-            mask = np.zeros((h, w), dtype=np.uint8)
-            cv2.drawContours(mask, [self._contour], 0, color = 255, thickness= -1,
-                             lineType=cv2.LINE_8, offset=(-x, -y))
-
-            if not mask_in_alpha:
-                array_copy = cv2.bitwise_and(array_copy, array_copy, mask=mask)
-            else:
-                mask = mask.reshape((h, w, 1))
-                array_copy = np.concatenate([array_copy, mask], 2)
-        return array_copy
-
     def parent_image_array(self, cache=False):
         return self._parent_image.read(cache)
 
     @property
     def parent_image(self):
         return self._parent_image
-    @property
-    def datetime(self):
-        return self._parent_image.datetime
-    @property
-    def device(self):
-        return self._parent_image.device
+
 
     @property
     def stroke_col(self):
         return self._stroke_colour
+    
+    
     @property
     def fill_col(self):
         return self._fill_colour
