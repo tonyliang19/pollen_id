@@ -2,8 +2,11 @@ import hashlib
 import logging
 import os
 import numpy as np
+import dotenv
+import argparse
 from typing import List, Tuple, Union, IO
 from shapely.geometry import Polygon
+
 
 # STRING_DATETIME_FORMAT = '%Y-%m-%d_%H-%M-%S'
 
@@ -74,67 +77,65 @@ def iou_match_pairs(arr: np.ndarray, iou_threshold: float) -> List[Tuple[int, in
 #     return MyClass
 
 
-# class MLScriptParser(argparse.ArgumentParser):
-#     _valid_actions = {'fetch', 'train', 'qc', 'validate', 'push', 'predict', 'candidates'}
-#     _required_env_vars = ['BUNDLE_ROOT_DIR', 'LOCAL_CLIENT_DIR',
-#                           'API_HOST', 'API_USER', 'API_PASSWORD']
+class MLScriptParser(argparse.ArgumentParser):
+    _valid_actions = {'fetch', 'train', 'qc', 'validate', 'push', 'predict', 'candidates'}
+    _required_env_vars = ['BUNDLE_ROOT_DIR']
 
-#     def __init__(self, config_file=None):
-#         super().__init__()
+    def __init__(self, config_file=None):
+        super().__init__()
 
-#         self.add_argument("action", help=str(self._valid_actions))
+        self.add_argument("action", help=str(self._valid_actions))
 
-#         self.add_argument("-v", "--verbose", dest="verbose", default=False,
-#                           help="verbose",
-#                           action="store_true")
+        self.add_argument("-v", "--verbose", dest="verbose", default=False,
+                          help="verbose",
+                          action="store_true")
 
-#         self.add_argument("-D", "--debug", dest="debug", default=False,
-#                           help="debug",
-#                           action="store_true")
+        self.add_argument("-D", "--debug", dest="debug", default=False,
+                          help="debug",
+                          action="store_true")
 
-#         self.add_argument("-r", "--restart-training", dest="restart_training", default=False, action="store_true")
-#         self.add_argument("-g", "--gpu", dest="gpu", default=False, help="GPU", action="store_true")
-#         self.add_argument("-l", "--local-api", dest="local_api", default=False, help="Whether to use the local api", action="store_true")
-#         self._config_file = config_file
+        self.add_argument("-r", "--restart-training", dest="restart_training", default=False, action="store_true")
+        self.add_argument("-g", "--gpu", dest="gpu", default=False, help="GPU", action="store_true")
+        self._config_file = config_file
 
-#     def _get_env_conf(self):
-#         if self._config_file is not None:
-#             assert os.path.isfile(self._config_file)
-#             dotenv.load_dotenv(self._config_file)
+    def _get_env_conf(self):
+        if self._config_file is not None:
+            assert os.path.isfile(self._config_file)
+            dotenv.load_dotenv(self._config_file)
 
-#         out = {}
-#         for var_name in self._required_env_vars:
-#             out[var_name] = os.getenv(var_name)
-#             if not out[var_name]:
-#                 raise ValueError('No environment variable `%s''' % var_name)
-#         return out
+        out = {}
+        for var_name in self._required_env_vars:
+            out[var_name] = os.getenv(var_name)
+            if not out[var_name]:
+                raise ValueError('No environment variable `%s''' % var_name)
+        return out
 
-#     def get_opt_dict(self):
-#         args = self.parse_args()
-#         option_dict = vars(args)
-#         if option_dict['action'] not in self._valid_actions:
-#             logging.error('Wrong action!')
-#             self.print_help()
-#             exit(1)
+    def get_opt_dict(self):
+        args = self.parse_args()
+        option_dict = vars(args)
+        if option_dict['action'] not in self._valid_actions:
+            logging.error('Wrong action!')
+            self.print_help()
+            exit(1)
 
-#         if option_dict['gpu']:
-#             option_dict['device'] = 'cuda'
-#         else:
-#             option_dict['device'] = 'cpu'
+        if option_dict['gpu']:
+            option_dict['device'] = 'cuda'
+        else:
+            option_dict['device'] = 'cpu'
 
-#         if option_dict['verbose']:
-#             logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-#                                 datefmt='%Y-%m-%d %H:%M:%S',
-#                                 level=logging.INFO)
-#         if option_dict['debug']:
-#             logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-#                                 datefmt='%Y-%m-%d %H:%M:%S',
-#                                 level=logging.DEBUG)
+        if option_dict['verbose']:
+            logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                                datefmt='%Y-%m-%d %H:%M:%S',
+                                level=logging.INFO)
+        if option_dict['debug']:
+            logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                                datefmt='%Y-%m-%d %H:%M:%S',
+                                level=logging.DEBUG)
 
-#         # 'BUNDLE_DIR', 'LOCAL_CLIENT_DIR'
-#         env_conf = self._get_env_conf()
-#         option_dict.update(env_conf)
-#         return option_dict
+        # 'BUNDLE_DIR', 'LOCAL_CLIENT_DIR'
+        env_conf = self._get_env_conf()
+        option_dict.update(env_conf)
+        return option_dict
 
 
 

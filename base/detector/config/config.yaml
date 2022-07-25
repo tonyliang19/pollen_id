@@ -24,7 +24,7 @@ DATALOADER:
   NUM_WORKERS: 2 # originally 8
 SOLVER:
   IMS_PER_BATCH: 2 # originally 14
-  BASE_LR:  0.0000001 # originally 0.05
+  BASE_LR:  0.00001 # originally 0.05
   MAX_ITER: 550000
   GAMMA: 0.8
   STEPS:
@@ -55,11 +55,11 @@ INPUT:
     TYPE: absolute
 
 CLASSES:
-  - ['pollen', '#0000ff']
+  - ['pollen', 'non-pollen']
 
 BASE_MODEL_PREFIX: 'COCO-InstanceSegmentation/'
 MIN_MAX_OBJ_SIZE:
-  - 20
+  - 10
   - 600
   
 PRINTING_PERIOD: 10
