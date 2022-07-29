@@ -7,11 +7,11 @@ from detectron2.engine import HookBase
 import detectron2.utils.comm as comm
 
 
-from base.detector.predictor import Predictor
-from base.image import SVGImage
+from pollen_id.detector.predictor import Predictor
+from pollen_id.image import SVGImage
 # from base.utils import iou, iou_match_pairs
-from base.trainer import BaseTrainer
-from base.detector.ml_bundle import MLBundle
+from pollen_id.trainer import BaseTrainer
+from pollen_id.detector.ml_bundle import MLBundle
 
 
 class ValLossHook(HookBase):

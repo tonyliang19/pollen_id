@@ -8,9 +8,9 @@ import glob
 import logging
 import pickle
 from typing import List
-from base.utils import md5
-from base.dataset import BaseDataset
-from base.image import SVGImage
+from pollen_id.utils import md5
+from pollen_id.dataset import BaseDataset
+from pollen_id.image import SVGImage
 from PIL import Image
 from detectron2.structures.boxes import BoxMode
 from detectron2.data.catalog import DatasetCatalog, MetadataCatalog

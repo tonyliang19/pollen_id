@@ -1,11 +1,11 @@
 import torch
 import numpy as np
 from shapely.geometry import Polygon
-from base.image import Image
+from pollen_id.image import Image
 from typing import Tuple, Dict, List, Any
-from base.annotations import Annotation
-from base.predictor import BasePredictor
-from base.detector.ml_bundle import MLBundle
+from pollen_id.annotations import Annotation
+from pollen_id.predictor import BasePredictor
+from pollen_id.detector.ml_bundle import MLBundle
 from detectron2.engine import DefaultPredictor
 import cv2
 import logging

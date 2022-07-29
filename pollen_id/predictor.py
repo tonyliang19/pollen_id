@@ -1,4 +1,4 @@
-from base.ml_bundle import BaseMLBundle
+from pollen_id.ml_bundle import BaseMLBundle
 
 
 class BasePredictor(object):

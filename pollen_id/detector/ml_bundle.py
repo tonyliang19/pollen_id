@@ -1,6 +1,6 @@
 import os
-from base.ml_bundle import BaseMLBundle
-from base.detector.dataset import Dataset
+from pollen_id.ml_bundle import BaseMLBundle
+from pollen_id.detector.dataset import Dataset
 import yaml
 from detectron2.config import get_cfg
 from detectron2 import model_zoo

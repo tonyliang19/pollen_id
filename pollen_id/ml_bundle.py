@@ -3,8 +3,8 @@ import logging
 from abc import ABC
 
 
-from base.dataset import BaseDataset
-from base.utils import md5
+from pollen_id.dataset import BaseDataset
+from pollen_id.utils import md5
 
 
 class BaseMLBundle(ABC):

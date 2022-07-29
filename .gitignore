@@ -6,3 +6,5 @@ bundles/
 main.py
 output/
 standalone.sh
+*.egg_info/
+*.egg-info/

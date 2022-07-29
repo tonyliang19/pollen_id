@@ -1,7 +1,7 @@
 from abc import ABC
 
-from base.ml_bundle import BaseMLBundle
-from base.predictor import BasePredictor
+from pollen_id.ml_bundle import BaseMLBundle
+from pollen_id.predictor import BasePredictor
 
 
 class BaseTrainer(ABC):

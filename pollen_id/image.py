@@ -17,7 +17,7 @@ import cv2
 import numpy as np
 import svgpathtools
 from cairosvg import svg2png
-from base.annotations import Annotation, DictAnnotation
+from pollen_id.annotations import Annotation, DictAnnotation
 
 
 class Image(object):
