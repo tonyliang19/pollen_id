@@ -5,3 +5,4 @@ base.egg-info/
 bundles/
 main.py
 output/
+standalone.sh
