@@ -56,10 +56,10 @@ class Dataset(BaseDataset):
                 else:
                     self._training_data.append(entry)
 
-            if not self._config.DATASETS.TRAIN[0] in DatasetCatalog:
+            if not self._config.DATASETS.TRAIN[0] in DatasetCatalog.list():
                 DatasetCatalog.register(self._config.DATASETS.TRAIN[0], lambda: self._training_data)
                 MetadataCatalog.get(self._config.DATASETS.TRAIN[0]).set(thing_classes=self._config.CLASSES)
-            if not self._config.DATASETS.TEST[0] in DatasetCatalog:
+            if not self._config.DATASETS.TEST[0] in DatasetCatalog.list():
                 DatasetCatalog.register(self._config.DATASETS.TEST[0], lambda: self._validation_data)
                 MetadataCatalog.get(self._config.DATASETS.TEST[0]).set(thing_classes=self._config.CLASSES)
 
