@@ -190,23 +190,23 @@ class DatasetMapper(object):
         dataset_dict["instances"] = du.filter_empty_instances(instances)
         return dataset_dict
 
-#     def _validation_crops(self, dataset_dict):
-#         image = du.read_image(dataset_dict["file_name"], format=self.img_format)
+     def _validation_crops(self, dataset_dict):
+         image = du.read_image(dataset_dict["file_name"], format=self.img_format)
 
 
 
-#         dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32")).contiguous()
-# #         annots = [
+         dataset_dict["image"] = torch.as_tensor(image.transpose(2, 0, 1).astype("float32")).contiguous()
+# #          annots = [
 # #            #du.transform_instance_annotations(obj, transforms, image.shape[:2])
 # #            for obj in dataset_dict.pop("annotations")
 # #            #if obj.get("iscrowd", 0) == 0
 # # ]
-#         annots = dataset_dict["annotations"]
+         annots = dataset_dict["annotations"]
 #         #print(f"annots: {annots}")
-#         instances = du.annotations_to_instances(annots, image.shape[:2])
-#         dataset_dict["instances"] = du.filter_empty_instances(instances)
+         instances = du.annotations_to_instances(annots, image.shape[:2])
+         dataset_dict["instances"] = du.filter_empty_instances(instances)
 #         #print(f"Instances: {dataset_dict['instances']}")
-#         return dataset_dict
+         return dataset_dict
     
     
 def _objs_from_svg(svg_path, config):

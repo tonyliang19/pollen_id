@@ -59,7 +59,7 @@ INPUT:
     TYPE: absolute
 
 CLASSES:
-  - "Pollen"
+  - "pollen"
 
 BASE_MODEL_PREFIX: 'COCO-InstanceSegmentation/'
 MIN_MAX_OBJ_SIZE:
