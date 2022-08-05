@@ -27,7 +27,7 @@ class ValLossHook(HookBase):
         """
         if self._last_validation_output and (self.trainer.iter + 1) % self.cfg.TEST_PERIOD != 0:
             return
-        loader = self.trainer.build_test_loader(self.cfg, self._dataset_name)
+        loader = self.trainer.build_test_loader(cfg=self.cfg, dataset_name=self._dataset_name)
 
         with torch.no_grad():
             all_losses = []
@@ -80,7 +80,7 @@ class Trainer(BaseTrainer):
         self._detectron_trainer = DetectronTrainer(ml_bundle)
 
         self._detectron_trainer.register_hooks(
-            [ValLossHook(self._ml_bundle.config, self._ml_bundle.name + "_val")]
+            [ValLossHook(cfg=self._ml_bundle.config, dataset_name=self._ml_bundle.name + "_val")]
         )
 
         for hook in self._detectron_trainer._hooks:
