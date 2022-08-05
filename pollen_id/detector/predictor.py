@@ -13,7 +13,6 @@ import math
 
 
 class Predictor(BasePredictor):
-    _detect_client_chunk_size = 64
     _minimum_tile_overlap = 500
     _score_threshold = 0.85
     _iou_threshold = 0.33
@@ -72,14 +71,8 @@ class Predictor(BasePredictor):
     def _detect_instances(self, img: Image):
         polys = []
         classes = []
-        logging.debug(img)
+        # logging.debug(img)
 
-        # array = cv2.copyMakeBorder(img.read(),
-        #                            self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
-        #                            self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
-        #                            self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
-        #                            self._ml_bundle.config.ORIGINAL_IMAGE_PADDING,
-        #                            cv2.BORDER_CONSTANT, value=(0, 0, 0))
         array = img.read()
 
         # todo
@@ -90,19 +83,19 @@ class Predictor(BasePredictor):
         if array.shape[1] <= 1024:
             x_range = [0]
             x_n_tiles = 1
-        else:
-            x_n_tiles = math.ceil(1 + (array.shape[1] - 1024) / (1024 - self._minimum_tile_overlap))
-            x_stride = (array.shape[1] - 1024) // (x_n_tiles - 1)
-            x_range = [r for r in range(0, array.shape[1] - 1023, x_stride)]
+        # else:
+        #     x_n_tiles = math.ceil(1 + (array.shape[1] - 1024) / (1024 - self._minimum_tile_overlap))
+        #     x_stride = (array.shape[1] - 1024) // (x_n_tiles - 1)
+        #     x_range = [r for r in range(0, array.shape[1] - 1023, x_stride)]
 
         if array.shape[0] <= 1024:
             y_range = [0]
             y_n_tiles = 1
 
-        else:
-            y_n_tiles = math.ceil(1 + (array.shape[0] - 1024) / (1024 - self._minimum_tile_overlap))
-            y_stride = (array.shape[0] - 1024) // (y_n_tiles - 1)
-            y_range = [r for r in range(0, array.shape[0] - 1023, y_stride)]
+        # else:
+        #     y_n_tiles = math.ceil(1 + (array.shape[0] - 1024) / (1024 - self._minimum_tile_overlap))
+        #     y_stride = (array.shape[0] - 1024) // (y_n_tiles - 1)
+        #     y_range = [r for r in range(0, array.shape[0] - 1023, y_stride)]
         offsets = []
         for n, j in enumerate(y_range):
             for m, i in enumerate(x_range):
@@ -117,14 +110,6 @@ class Predictor(BasePredictor):
             big_enough = big_enough.__or__(p_bt[:, 2] - p_bt[:, 0] > self._ml_bundle.config.MIN_MAX_OBJ_SIZE[0])
             big_enough = big_enough.__or__(p_bt[:, 3] - p_bt[:, 1] > self._ml_bundle.config.MIN_MAX_OBJ_SIZE[0])
 
-            # print("Keeping, removing")
-            # print(sum(big_enough), len(big_enough))
-            # p['instances'] = p['instances'][big_enough]
-            # print(len(p['instances']))
-
-            # p_bt = p['instances'].pred_boxes.tensor
-
-            # p['instances'] = p['instances'][]
             # we remove redundant edge instances as they should overlap
             non_edge_cases = torch.ones_like(p_bt[:, 0], dtype=torch.bool)
 
@@ -193,6 +178,6 @@ class Predictor(BasePredictor):
         annotation_list = []
         for _, pred_class, poly in all_valid:
             stroke = "#00ff80"
-            a = Annotation(poly, parent_image=img, stroke_colour=stroke, name=class_name)
+            a = Annotation(poly, parent_image=img, stroke_colour=stroke)
             annotation_list.append(a)
         return annotation_list

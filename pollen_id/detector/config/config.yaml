@@ -7,24 +7,28 @@ MODEL:
     # the featuremap is 256 x 256, and the original image is 1024 x 1024, so a scale of 1/4.
     # the smallest discernible objects are about 32px wide so the smallest anchor is 8 as 8*4 = 32
     SIZES:
-    - - 8
+    - - 4
+      - 8
       - 16
       - 32
       - 64
-      - 128
+  LOAD_PROPOSALS: false
   ROI_HEADS:
-      BATCH_SIZE_PER_IMAGE: 256
+      NUM_CLASSES: 1
+      BATCH_SIZE_PER_IMAGE: 128
+      SCORE_THRESH_TEST: 0.7
 
   PIXEL_MEAN:
-  - 200.0
-  - 100.0
-  - 1.0
+  - 198.8
+  - 155.6
+  - 186.2
 
 DATALOADER:
   NUM_WORKERS: 2 # originally 8
 SOLVER:
+  CHECKPOINT_PERIOD: 500
   IMS_PER_BATCH: 2 # originally 14
-  BASE_LR:  0.00001 # originally 0.05
+  BASE_LR:  0.00025 # originally 0.05
   MAX_ITER: 550000
   GAMMA: 0.8
   STEPS:
@@ -41,26 +45,24 @@ SOLVER:
 
 
 TEST:
-  DETECTIONS_PER_IMAGE: 500
+  DETECTIONS_PER_IMAGE: 250 # 500
 
 # the featuremap is 256 x 256, and the original image is 1024 x 1024, so a scale of 1/4.
 # the smallest discernible objects are about 32px wide so the smallest anchor is 8 as 8*4 = 32
 
 INPUT:
   CROP:
-    ENABLED: true
+    ENABLED: false
     SIZE:
     - 1024
     - 1024
     TYPE: absolute
 
 CLASSES:
-  - ['pollen', 'non-pollen']
+  - "Pollen"
 
 BASE_MODEL_PREFIX: 'COCO-InstanceSegmentation/'
 MIN_MAX_OBJ_SIZE:
   - 10
-  - 600
+  - 720
   
-PRINTING_PERIOD: 10
-TEST_PERIOD: 10

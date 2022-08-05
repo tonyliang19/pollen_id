@@ -17,7 +17,7 @@ class BaseMLBundle(ABC):
     _name = None
     _DatasetClass = None  # must be implemented
 
-    def __init__(self, root_dir: str, device: str = 'cpu', cache_dir=None):
+    def __init__(self, root_dir: str, device: str = 'cuda', cache_dir=None):
         """
         An abstract class that organises all the components of a ML project:
 
