@@ -34,7 +34,7 @@ And result in the following output:
 
 2) Follow [the official documentation of Detectron2 installation](https://detectron2.readthedocs.io/en/latest/tutorials/install.html]), install PyTorch and torchvision that matches PyTorch installation, which redirects you to [PyTorch official website](https://pytorch.org/)
 
-And you will have a table of selections that generates the command to install pytorch and torchvision accordingly. Eg. I used the following options:
+    And you will have a table of selections that generates the command to install pytorch and torchvision accordingly. Eg. I used the following options:
 
 ```
 PyTorch Build: Stable(1.12.1)
@@ -50,12 +50,38 @@ pip3 install torch torchvision torchaudio --extra-index-url https://download.pyt
 
 ```
 
-3) After successfully completing [step 2](#2)), install these packages prior to build and install detectron2 from source:
+3) After successfully completing [step 2](#2)), install these packages prior to build and install Detectron2 from source:
 
 ```
 pip install cython ninja opencv-python
 
 ```
 
-The first two are required, as cython makes writing C extensions (most of detectron2 are build from and depend on) as easy as Python itself. And, ninja that builds detectron2 faster (helps a lot, as the package is huge). 
+    The first two are required, as cython makes writing C extensions (most of Detectron2 are build from and depend on) as easy as Python itself. And, ninja that builds detectron2 faster (helps a lot, as the package is huge). 
 
+
+4) After completed step 2 and step 3, you should be able to start build Detectron2 from source and run the following command (same as the one from their [official website](https://detectron2.readthedocs.io/en/latest/tutorials/install.html):
+
+```
+python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
+```
+
+    If any issues appeared, please refer to their documentation, and might take some time to have this setup.
+
+5) Then install a custom designed python package for this project:
+
+```
+pip install 'git+https://github.com/tonyliang19/pollen_id_package'
+
+or
+
+git clone https://github.com/tonyliang19/pollen_id_package
+cd pollen_id_package
+pip install -e .
+
+or 
+
+pip install pollen_id (after published on pypi)
+```
+
+    As this custom package contains setup of config files and other python files that handles your data and turns them COCO Format json data that's needed for training your custom model, and contains as well custom predictor and makes inference on unseen data, detect instances and set annotations to those images.
