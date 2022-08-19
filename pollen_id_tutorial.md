@@ -57,7 +57,7 @@ pip install cython ninja opencv-python
 
 ```
 
-    The first two are required, as cython makes writing C extensions (most of Detectron2 are build from and depend on) as easy as Python itself. And, ninja that builds detectron2 faster (helps a lot, as the package is huge). 
+The first two are required, as cython makes writing C extensions (most of Detectron2 are build from and depend on) as easy as Python itself. And, ninja that builds detectron2 faster (helps a lot, as the package is huge). 
 
 
 4) After completed step 2 and step 3, you should be able to start build Detectron2 from source and run the following command (same as the one from their [official website](https://detectron2.readthedocs.io/en/latest/tutorials/install.html):
@@ -66,7 +66,7 @@ pip install cython ninja opencv-python
 python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
 ```
 
-    If any issues appeared, please refer to their documentation, and might take some time to have this setup.
+If any issues appeared, please refer to their documentation, and might take some time to have this setup.
 
 5) Then install a custom designed python package for this project:
 
@@ -84,4 +84,4 @@ or
 pip install pollen_id (after published on pypi)
 ```
 
-    As this custom package contains setup of config files and other python files that handles your data and turns them COCO Format json data that's needed for training your custom model, and contains as well custom predictor and makes inference on unseen data, detect instances and set annotations to those images.
+As this custom package contains setup of config files and other python files that handles your data and turns them COCO Format json data that's needed for training your custom model, and contains as well custom predictor and makes inference on unseen data, detect instances and set annotations to those images.
