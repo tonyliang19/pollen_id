@@ -85,3 +85,8 @@ pip install pollen_id (after published on pypi)
 ```
 
 As this custom package contains setup of config files and other python files that handles your data and turns them COCO Format json data that's needed for training your custom model, and contains as well custom predictor and makes inference on unseen data, detect instances and set annotations to those images.
+
+
+### Training a model
+
+This sections goes through of how to train a custom model
