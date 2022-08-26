@@ -1,6 +1,6 @@
 # pollen_id
 
-Machine Learning bundle that contains custom Dataset and config files for pollen detection using Detectron2.
+Machine Learning bundle that contains custom Dataset and config files for pollen detection using Detectron2. It contains helpers that process raw SVG images to COCO-format JSONs that has annotations, segmentations that could represent the image.
 
 ## Installation
 
@@ -10,7 +10,13 @@ $ pip install pollen_id
 
 ## Usage
 
-- TODO
+```python
+from pollen_id.detector.ml_bundle import MLBundle
+
+# creates the ML Bundle with config loaded on configs/ directory
+bundle = MLBundle(SRC_PATH)
+
+```
 
 ## Contributing
 
